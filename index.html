@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Matrix Lab — Web Edition</title>
+    
+    <!-- Настройки для iPhone (PWA) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Matrix Lab">
+    <link rel="apple-touch-icon" href="https://img.icons8.com/neon/180/matrix.png">
+
+    <style>
+        :root {
+            --bg-dark: #090D16;
+            --card-dark: #131D2E;
+            --accent-cyan: #06B6D4;
+            --accent-purple: #8B5CF6;
+            --accent-emerald: #10B981;
+            --text-white: #F1F5F9;
+            --text-dim: #64748B;
+            --border-color: #24334D;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(180deg, var(--bg-dark) 0%, #030712 100%);
+            color: var(--text-white);
+            min-height: 100vh;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Шапка */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 10px;
+        }
+        .header h1 {
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 1.5px;
+        }
+        .header p {
+            font-size: 11px;
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        /* Кнопка истории */
+        .btn-history-badge {
+            background: var(--card-dark);
+            border: 1px solid var(--border-color);
+            color: var(--accent-cyan);
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        /* Панель выбора матриц и размера */
+        .panel {
+            background: var(--card-dark);
+            border-radius: 14px;
+            padding: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .tabs {
+            display: flex;
+            gap: 4px;
+        }
+        .tab {
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            color: var(--text-dim);
+            transition: 0.2s;
+        }
+        .tab.active {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--accent-cyan);
+            border: 1px solid var(--accent-cyan);
+        }
+
+        .size-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-counter {
+            width: 32px;
+            height: 32px;
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-white);
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .btn-counter:active { transform: scale(0.9); }
+
+        /* Сетка матрицы */
+        .matrix-box {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            margin: 10px 0;
+            overflow-x: auto;
+            padding: 4px;
+        }
+        .bracket {
+            width: 4px;
+            background: var(--accent-cyan);
+            border-radius: 4px;
+            align-self: stretch;
+        }
+        .grid {
+            display: grid;
+            gap: 6px;
+        }
+        .matrix-cell {
+            width: 52px;
+            height: 52px;
+            background: var(--card-dark);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-white);
+            font-size: 14px;
+            font-weight: 600;
+            text-align: center;
+            outline: none;
+            transition: 0.2s;
+        }
+        .matrix-cell:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 8px rgba(6, 182, 212, 0.3);
+        }
+
+        /* Кнопки управления матрицей */
+        .util-buttons {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+        }
+        .btn-util {
+            background: #1E293B;
+            border: none;
+            color: var(--text-white);
+            padding: 6px 14px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .btn-util.paste { color: var(--accent-cyan); background: rgba(6, 182, 212, 0.15); }
+        .btn-util.clear { color: #F87171; }
+
+        /* Сетка математических операций */
+        .section-title {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 6px;
+        }
+        .btn-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+        .btn-row.two-col {
+            grid-template-columns: repeat(2, 1fr);
+        }
+        .btn-op {
+            background: var(--card-dark);
+            border: 1px solid var(--border-color);
+            color: var(--text-white);
+            padding: 10px 4px;
+            border-radius: 10px;
+            font-size: 11.5px;
+            font-weight: bold;
+            cursor: pointer;
+            text-align: center;
+            transition: 0.15s;
+        }
+        .btn-op:active { transform: scale(0.95); }
+        .btn-op.highlight { border-color: rgba(6, 182, 212, 0.5); background: #1E293B; }
+
+        /* Карточка результата */
+        .result-card {
+            background: var(--card-dark);
+            border: 1px solid var(--accent-emerald);
+            border-radius: 14px;
+            padding: 14px;
+            margin-top: 10px;
+            display: none;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--accent-emerald);
+        }
+        .result-content {
+            font-family: monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            line-height: 1.5;
+            text-align: center;
+            overflow-x: auto;
+        }
+        .result-transfer {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 8px;
+        }
+        .btn-transfer {
+            flex: 1;
+            padding: 6px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: bold;
+            background: transparent;
+            cursor: pointer;
+        }
+        .btn-transfer.a { border: 1px solid var(--accent-cyan); color: var(--accent-cyan); }
+        .btn-transfer.b { border: 1px solid var(--accent-purple); color: var(--accent-purple); }
+        .btn-transfer.c { border: 1px solid var(--accent-emerald); color: var(--accent-emerald); }
+
+        /* Шторка истории */
+        .modal {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card-dark);
+            border-top: 1px solid var(--border-color);
+            border-radius: 20px 20px 0 0;
+            padding: 16px;
+            max-height: 70vh;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.8);
+            z-index: 100;
+        }
+        .history-item {
+            background: #0F172A;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Шапка -->
+    <div class="header">
+        <div>
+            <h1>MATRIX LAB</h1>
+            <p>Theory of Control • Web & iOS Edition</p>
+        </div>
+        <button class="btn-history-badge" onclick="toggleHistory()">🕒 <span id="hist-count">0</span></button>
+    </div>
+
+    <!-- Табы A, B, C и выбор размера (до 7х7) -->
+    <div class="panel">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab(0)">A</div>
+            <div class="tab" onclick="switchTab(1)">B</div>
+            <div class="tab" onclick="switchTab(2)">C</div>
+        </div>
+        <div class="size-controls">
+            <div class="btn-counter" onclick="changeSize(-1)">−</div>
+            <span id="size-label" style="font-weight: bold; font-size: 14px;">3×3</span>
+            <div class="btn-counter" onclick="changeSize(1)">+</div>
+        </div>
+    </div>
+
+    <!-- Сетка матрицы -->
+    <div class="matrix-box">
+        <div class="bracket" id="bracket-left"></div>
+        <div class="grid" id="matrix-grid"></div>
+        <div class="bracket" id="bracket-right"></div>
+    </div>
+
+    <!-- Утилиты -->
+    <div class="util-buttons">
+        <button class="btn-util" onclick="fillRandom()">Рандом</button>
+        <button class="btn-util paste" onclick="pasteMatrix()">Вставить</button>
+        <button class="btn-util clear" onclick="clearMatrix()">Очистить</button>
+    </div>
+
+    <!-- Тройные операции -->
+    <div class="section-title">Тройные операции (A, B, C):</div>
+    <div class="btn-row">
+        <button class="btn-op highlight" onclick="calcTripleAdd()">A + B + C</button>
+        <button class="btn-op highlight" onclick="calcTripleSub()">A - B - C</button>
+        <button class="btn-op highlight" onclick="calcTripleMul()">A × B × C</button>
+    </div>
+
+    <!-- Бинарные операции A и B -->
+    <div class="section-title">Операции A и B:</div>
+    <div class="btn-row">
+        <button class="btn-op" onclick="calcAdd()">A + B</button>
+        <button class="btn-op" onclick="calcSub()">A - B</button>
+        <button class="btn-op" onclick="calcMul()">A × B</button>
+    </div>
+
+    <!-- Операции над выбранной -->
+    <div class="section-title">Операции над выбранной матрицей:</div>
+    <div class="btn-row two-col">
+        <button class="btn-op" onclick="calcInverse()">A⁻¹ (Обратная)</button>
+        <button class="btn-op" onclick="calcTranspose()">Aᵀ (Трансп.)</button>
+    </div>
+    <div class="btn-row two-col" style="margin-top: 6px;">
+        <button class="btn-op" onclick="calcDet()">det (Определитель)</button>
+        <button class="btn-op" onclick="calcRank()">Ранг (Rank)</button>
+    </div>
+    <div class="btn-row two-col" style="margin-top: 6px;">
+        <button class="btn-op" onclick="calcTrace()">След Tr(A)</button>
+        <button class="btn-op highlight" onclick="calcNorm()">‖A‖_F Норма Фробениуса</button>
+    </div>
+
+    <!-- Карточка результата -->
+    <div class="result-card" id="result-card">
+        <div class="result-header">
+            <span>Результат:</span>
+            <span style="cursor: pointer; color: var(--text-dim);" onclick="copyResult()">Копировать 📋</span>
+        </div>
+        <div class="result-content" id="result-text"></div>
+        <div class="section-title">Перенести результат в:</div>
+        <div class="result-transfer">
+            <button class="btn-transfer a" onclick="transferResult(0)">➔ в A</button>
+            <button class="btn-transfer b" onclick="transferResult(1)">➔ в B</button>
+            <button class="btn-transfer c" onclick="transferResult(2)">➔ в C</button>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно истории -->
+<div class="modal" id="history-modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px;">История вычислений</h3>
+        <button class="btn-util clear" onclick="clearHistory()">Очистить</button>
+    </div>
+    <div id="history-list"></div>
+    <button class="btn-op" style="width: 100%; margin-top: 10px;" onclick="toggleHistory()">Закрыть</button>
+</div>
+
+<script>
+    let size = 3;
+    let currentTab = 0; // 0 -> A, 1 -> B, 2 -> C
+    let matrices = [
+        createEmptyMatrix(3),
+        createEmptyMatrix(3),
+        createEmptyMatrix(3)
+    ];
+    let lastResultMatrix = null;
+    let history = [];
+
+    function createEmptyMatrix(n) {
+        return Array(n).fill(0).map(() => Array(n).fill(0));
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('matrix-grid');
+        grid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+        grid.innerHTML = '';
+
+        const data = matrices[currentTab];
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.className = 'matrix-cell';
+                input.value = data[i][j];
+                input.onfocus = () => { if (input.value === '0') input.value = ''; };
+                input.onblur = () => { if (input.value === '') input.value = '0'; };
+                input.oninput = (e) => {
+                    matrices[currentTab][i][j] = parseFloat(e.target.value) || 0;
+                };
+                grid.appendChild(input);
+            }
+        }
+        document.getElementById('size-label').innerText = `${size}×${size}`;
+    }
+
+    function changeSize(delta) {
+        const newSize = size + delta;
+        if (newSize < 2 || newSize > 7) return;
+        
+        for (let m = 0; m < 3; m++) {
+            const old = matrices[m];
+            const next = createEmptyMatrix(newSize);
+            for (let i = 0; i < Math.min(size, newSize); i++) {
+                for (let j = 0; j < Math.min(size, newSize); j++) {
+                    next[i][j] = old[i][j] || 0;
+                }
+            }
+            matrices[m] = next;
+        }
+        size = newSize;
+        renderGrid();
+    }
+
+    function switchTab(tabIndex) {
+        currentTab = tabIndex;
+        document.querySelectorAll('.tab').forEach((el, idx) => {
+            el.classList.toggle('active', idx === tabIndex);
+        });
+        renderGrid();
+    }
+
+    function fillRandom() {
+        for (let i = 0; i < size; i++) {
+            for (let j = 0; j < size; j++) {
+                matrices[currentTab][i][j] = Math.floor(Math.random() * 19) - 9;
+            }
+        }
+        renderGrid();
+    }
+
+    function clearMatrix() {
+        matrices[currentTab] = createEmptyMatrix(size);
+        renderGrid();
+    }
+
+    async function pasteMatrix() {
+        try {
+            const text = await navigator.clipboard.readText();
+            const normalized = text.replace(/,/g, '.').replace(/−|–|—/g, '-');
+            const numbers = normalized.match(/-?\d+(\.\d+)?/g);
+            if (!numbers) return alert('Не найдено чисел для вставки!');
+
+            let idx = 0;
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    if (idx < numbers.length) {
+                        matrices[currentTab][i][j] = parseFloat(numbers[idx++]) || 0;
+                    }
+                }
+            }
+            renderGrid();
+        } catch (e) {
+            alert('Разрешите доступ к буферу обмена!');
+        }
+    }
+
+    // --- МАТЕМАТИКА ---
+    function formatNum(v) {
+        return Math.abs(v) < 1e-9 ? '0' : (v % 1 === 0 ? v.toString() : v.toFixed(3));
+    }
+
+    function showMatrixResult(res, title) {
+        lastResultMatrix = res;
+        const text = res.map(row => row.map(v => formatNum(v).padStart(6, ' ')).join('  ')).join('\n');
+        document.getElementById('result-text').innerText = text;
+        document.getElementById('result-card').style.display = 'flex';
+        addHistory(title, text, res);
+    }
+
+    function showScalarResult(val, title) {
+        lastResultMatrix = null;
+        document.getElementById('result-text').innerText = `${title} = ${val}`;
+        document.getElementById('result-card').style.display = 'flex';
+        addHistory(title, `${title} = ${val}`, null);
+    }
+
+    function addMatrices(a, b) {
+        return a.map((row, i) => row.map((v, j) => v + b[i][j]));
+    }
+    function subMatrices(a, b) {
+        return a.map((row, i) => row.map((v, j) => v - b[i][j]));
+    }
+    function mulMatrices(a, b) {
+        const n = a.length;
+        const res = createEmptyMatrix(n);
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                let sum = 0;
+                for (let k = 0; k < n; k++) sum += a[i][k] * b[k][j];
+                res[i][j] = sum;
+            }
+        }
+        return res;
+    }
+
+    function calcAdd() { showMatrixResult(addMatrices(matrices[0], matrices[1]), 'A + B'); }
+    function calcSub() { showMatrixResult(subMatrices(matrices[0], matrices[1]), 'A - B'); }
+    function calcMul() { showMatrixResult(mulMatrices(matrices[0], matrices[1]), 'A × B'); }
+
+    function calcTripleAdd() { showMatrixResult(addMatrices(addMatrices(matrices[0], matrices[1]), matrices[2]), 'A + B + C'); }
+    function calcTripleSub() { showMatrixResult(subMatrices(subMatrices(matrices[0], matrices[1]), matrices[2]), 'A - B - C'); }
+    function calcTripleMul() { showMatrixResult(mulMatrices(mulMatrices(matrices[0], matrices[1]), matrices[2]), 'A × B × C'); }
+
+    function calcTranspose() {
+        const m = matrices[currentTab];
+        const res = m.map((_, i) => m.map(row => row[i]));
+        showMatrixResult(res, 'Aᵀ');
+    }
+
+    function calcNorm() {
+        const m = matrices[currentTab];
+        let sum = 0;
+        m.forEach(row => row.forEach(v => sum += v * v));
+        showScalarResult(Math.sqrt(sum).toFixed(3), '‖A‖_F');
+    }
+
+    function calcTrace() {
+        const m = matrices[currentTab];
+        let tr = 0;
+        for (let i = 0; i < size; i++) tr += m[i][i];
+        showScalarResult(formatNum(tr), 'Tr(A)');
+    }
+
+    function calcDet() {
+        const a = matrices[currentTab].map(r => [...r]);
+        let det = 1;
+        for (let i = 0; i < size; i++) {
+            let pivot = i;
+            for (let j = i + 1; j < size; j++) {
+                if (Math.abs(a[j][i]) > Math.abs(a[pivot][i])) pivot = j;
+            }
+            if (Math.abs(a[pivot][i]) < 1e-9) return showScalarResult('0', 'det(A)');
+            if (i !== pivot) {
+                [a[i], a[pivot]] = [a[pivot], a[i]];
+                det = -det;
+            }
+            det *= a[i][i];
+            for (let j = i + 1; j < size; j++) {
+                const factor = a[j][i] / a[i][i];
+                for (let k = i + 1; k < size; k++) a[j][k] -= factor * a[i][k];
+            }
+        }
+        showScalarResult(formatNum(det), 'det(A)');
+    }
+
+    function calcRank() {
+        const a = matrices[currentTab].map(r => [...r]);
+        let rank = size;
+        for (let row = 0; row < rank; row++) {
+            if (Math.abs(a[row][row]) > 1e-9) {
+                for (let col = 0; col < size; col++) {
+                    if (col !== row) {
+                        const mult = a[col][row] / a[row][row];
+                        for (let i = 0; i < rank; i++) a[col][i] -= mult * a[row][i];
+                    }
+                }
+            } else {
+                let reduce = true;
+                for (let i = row + 1; i < size; i++) {
+                    if (Math.abs(a[i][row]) > 1e-9) {
+                        [a[row], a[i]] = [a[i], a[row]];
+                        reduce = false;
+                        break;
+                    }
+                }
+                if (reduce) { rank--; for (let i = 0; i < size; i++) a[i][row] = a[i][rank]; }
+                row--;
+            }
+        }
+        showScalarResult(rank.toString(), 'rank(A)');
+    }
+
+    function calcInverse() {
+        const n = size;
+        const aug = matrices[currentTab].map((row, i) => [
+            ...row, ...Array(n).fill(0).map((_, j) => (i === j ? 1 : 0))
+        ]);
+
+        for (let i = 0; i < n; i++) {
+            let maxRow = i;
+            for (let k = i + 1; k < n; k++) {
+                if (Math.abs(aug[k][i]) > Math.abs(aug[maxRow][i])) maxRow = k;
+            }
+            [aug[i], aug[maxRow]] = [aug[maxRow], aug[i]];
+            if (Math.abs(aug[i][i]) < 1e-9) return alert('Определитель равен 0, обратной нет!');
+
+            const div = aug[i][i];
+            for (let j = 0; j < 2 * n; j++) aug[i][j] /= div;
+            for (let k = 0; k < n; k++) {
+                if (k !== i) {
+                    const factor = aug[k][i];
+                    for (let j = 0; j < 2 * n; j++) aug[k][j] -= factor * aug[i][j];
+                }
+            }
+        }
+        const inv = aug.map(row => row.slice(n));
+        showMatrixResult(inv, 'A⁻¹');
+    }
+
+    function transferResult(targetTab) {
+        if (!lastResultMatrix) return;
+        matrices[targetTab] = lastResultMatrix.map(r => [...r]);
+        switchTab(targetTab);
+    }
+
+    function copyResult() {
+        const txt = document.getElementById('result-text').innerText;
+        navigator.clipboard.writeText(txt);
+        alert('Результат скопирован в буфер!');
+    }
+
+    // --- ИСТОРИЯ ---
+    function addHistory(title, text, mat) {
+        const time = new Date().toLocaleTimeString();
+        history.unshift({ title, text, mat, time });
+        document.getElementById('hist-count').innerText = history.length;
+        renderHistory();
+    }
+
+    function renderHistory() {
+        const list = document.getElementById('history-list');
+        list.innerHTML = history.map(item => `
+            <div class="history-item">
+                <div style="display:flex; justify-content:space-between; color:var(--accent-cyan); font-weight:bold;">
+                    <span>${item.title}</span>
+                    <span style="color:var(--text-dim);">${item.time}</span>
+                </div>
+                <div style="margin-top:6px; white-space:pre-wrap;">${item.text}</div>
+            </div>
+        `).join('');
+    }
+
+    function toggleHistory() {
+        const m = document.getElementById('history-modal');
+        m.style.display = m.style.display === 'block' ? 'none' : 'block';
+    }
+
+    function clearHistory() {
+        history = [];
+        document.getElementById('hist-count').innerText = '0';
+        renderHistory();
+    }
+
+    // Первый запуск
+    renderGrid();
+</script>
+</body>
+</html>
