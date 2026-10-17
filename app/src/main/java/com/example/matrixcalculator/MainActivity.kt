@@ -87,7 +87,7 @@ fun MainAppSwitcher() {
     val historyList = remember { mutableStateListOf<HistoryItem>() }
     var showHistorySheet by remember { mutableStateOf(false) }
 
-    // --- КВАДРАТНЫЕ МАТРИЦЫ (Живут вечно, не сбрасываются) ---
+    // --- КВАДРАТНЫЕ МАТРИЦЫ ---
     var squareSize by rememberSaveable { mutableIntStateOf(3) }
     var squareSelectedTab by rememberSaveable { mutableIntStateOf(0) }
     var squareMatrixA by rememberSaveable { mutableStateOf(List(3) { List(3) { "0" } }) }
@@ -95,7 +95,7 @@ fun MainAppSwitcher() {
     var squareMatrixC by rememberSaveable { mutableStateOf(List(3) { List(3) { "0" } }) }
     var squareScalarK by rememberSaveable { mutableStateOf("2") }
 
-    // --- ПРЯМОУГОЛЬНЫЕ МАТРИЦЫ (Живут вечно, не сбрасываются) ---
+    // --- ПРЯМОУГОЛЬНЫЕ МАТРИЦЫ ---
     var rectSelectedTab by rememberSaveable { mutableIntStateOf(0) }
     var rectRowsA by rememberSaveable { mutableIntStateOf(2) }
     var rectColsA by rememberSaveable { mutableIntStateOf(3) }
@@ -136,7 +136,7 @@ fun MainAppSwitcher() {
                         color = TextWhite
                     )
                     Text(
-                        text = "Theory of Control Edition",
+                        text = "Theory of Control Edition • Up to 7×7",
                         fontSize = 11.sp,
                         color = AccentCyan,
                         fontWeight = FontWeight.SemiBold
@@ -161,7 +161,7 @@ fun MainAppSwitcher() {
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Табы переключения режима
+            // Переключатель страниц
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -185,27 +185,27 @@ fun MainAppSwitcher() {
 
             Spacer(modifier = Modifier.height(10.dp))
 
+
+
+// СТАЛО (Добавляем связку с размером, чтобы Compose был ОБЯЗАН обновиться):
             AnimatedContent(
-                targetState = appMode,
+                targetState = Pair(appMode, if (appMode == 0) squareSize else rectRowsA * 10 + rectColsA),
                 transitionSpec = {
-                    if (targetState > initialState) {
-                        (slideInHorizontally { width -> width / 2 } + fadeIn())
-                            .togetherWith(slideOutHorizontally { width -> -width / 2 } + fadeOut())
-                    } else {
-                        (slideInHorizontally { width -> -width / 2 } + fadeIn())
-                            .togetherWith(slideOutHorizontally { width -> width / 2 } + fadeOut())
-                    }
+                    fadeIn().togetherWith(fadeOut())
                 },
                 label = "ScreenTransition"
-            ) { mode ->
+            ) { state ->
+                val mode = state.first
                 if (mode == 0) {
                     SquareMatricesScreen(
                         size = squareSize,
                         onSizeChange = { newSize ->
-                            squareSize = newSize
-                            squareMatrixA = resizeMatrix(squareMatrixA, newSize, newSize)
-                            squareMatrixB = resizeMatrix(squareMatrixB, newSize, newSize)
-                            squareMatrixC = resizeMatrix(squareMatrixC, newSize, newSize)
+                            if (newSize in 2..7) {
+                                squareSize = newSize
+                                squareMatrixA = resizeMatrix(squareMatrixA, newSize, newSize)
+                                squareMatrixB = resizeMatrix(squareMatrixB, newSize, newSize)
+                                squareMatrixC = resizeMatrix(squareMatrixC, newSize, newSize)
+                            }
                         },
                         selectedTab = squareSelectedTab,
                         onTabChange = { squareSelectedTab = it },
@@ -226,16 +226,20 @@ fun MainAppSwitcher() {
                         rowsA = rectRowsA,
                         colsA = rectColsA,
                         onSizeAChange = { r, c ->
-                            rectRowsA = r; rectColsA = c
-                            rectMatrixA = resizeMatrix(rectMatrixA, r, c)
+                            if (r in 1..7 && c in 1..7) {
+                                rectRowsA = r; rectColsA = c
+                                rectMatrixA = resizeMatrix(rectMatrixA, r, c)
+                            }
                         },
                         matrixA = rectMatrixA,
                         onMatrixAChange = { rectMatrixA = it },
                         rowsB = rectRowsB,
                         colsB = rectColsB,
                         onSizeBChange = { r, c ->
-                            rectRowsB = r; rectColsB = c
-                            rectMatrixB = resizeMatrix(rectMatrixB, r, c)
+                            if (r in 1..7 && c in 1..7) {
+                                rectRowsB = r; rectColsB = c
+                                rectMatrixB = resizeMatrix(rectMatrixB, r, c)
+                            }
                         },
                         matrixB = rectMatrixB,
                         onMatrixBChange = { rectMatrixB = it },
@@ -283,7 +287,7 @@ fun MainAppSwitcher() {
 }
 
 // -------------------------------------------------------------
-// РЕЖИМ 1: КВАДРАТНЫЕ МАТРИЦЫ (A, B, C)
+// РЕЖИМ 1: КВАДРАТНЫЕ МАТРИЦЫ (до 7x7)
 // -------------------------------------------------------------
 @Composable
 fun SquareMatricesScreen(
@@ -322,8 +326,13 @@ fun SquareMatricesScreen(
         }
     }
 
-    val calculatedCellSize = ((screenWidth - 48.dp) / size).coerceIn(48.dp, 64.dp)
-    val cellFontSize = if (calculatedCellSize < 54.dp) 13.sp else 16.sp
+    val calculatedCellSize = ((screenWidth - 44.dp) / size).coerceIn(44.dp, 64.dp)
+    val cellFontSize = when {
+        size >= 6 -> 11.sp
+        size >= 5 -> 12.sp
+        calculatedCellSize < 54.dp -> 13.sp
+        else -> 16.sp
+    }
 
     Column(
         modifier = Modifier
@@ -356,10 +365,25 @@ fun SquareMatricesScreen(
 
             Spacer(modifier = Modifier.width(10.dp))
 
+            // МГНОВЕННОЕ ИЗМЕНЕНИЕ ДО 7x7
             Row(verticalAlignment = Alignment.CenterVertically) {
-                CounterButton(symbol = "−", enabled = size > 2, onClick = { onSizeChange(size - 1) })
-                Text(text = "${size}×$size", color = TextWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.padding(horizontal = 10.dp))
-                CounterButton(symbol = "+", enabled = size < 5, onClick = { onSizeChange(size + 1) })
+                CounterButton(
+                    symbol = "−",
+                    enabled = size > 2,
+                    onClick = { if (size > 2) onSizeChange(size - 1) }
+                )
+                Text(
+                    text = "${size}×$size",
+                    color = TextWhite,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp)
+                )
+                CounterButton(
+                    symbol = "+",
+                    enabled = size < 7,
+                    onClick = { if (size < 7) onSizeChange(size + 1) }
+                )
             }
         }
 
@@ -390,7 +414,6 @@ fun SquareMatricesScreen(
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
             ) { Text("Рандом", color = TextWhite, fontSize = 11.sp) }
 
-            // ВОТ ОНА: Кнопка ВСТАВИТЬ из буфера обмена!
             FilledTonalButton(
                 onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -597,9 +620,8 @@ fun SquareMatricesScreen(
         )
     }
 }
-
 // -------------------------------------------------------------
-// РЕЖИМ 2: ПРЯМОУГОЛЬНЫЕ МАТРИЦЫ И ВЕКТОРЫ
+// РЕЖИМ 2: ПРЯМОУГОЛЬНЫЕ МАТРИЦЫ И ВЕКТОРЫ (до 7x7)
 // -------------------------------------------------------------
 @Composable
 fun RectangularMatricesScreen(
@@ -638,8 +660,13 @@ fun RectangularMatricesScreen(
         if (selectedTab == 0) onMatrixAChange(updated) else onMatrixBChange(updated)
     }
 
-    val calculatedCellSize = ((screenWidth - 48.dp) / curCols).coerceIn(48.dp, 64.dp)
-    val cellFontSize = if (calculatedCellSize < 54.dp) 13.sp else 16.sp
+    val calculatedCellSize = ((screenWidth - 44.dp) / curCols).coerceIn(44.dp, 64.dp)
+    val cellFontSize = when {
+        curCols >= 6 -> 11.sp
+        curCols >= 5 -> 12.sp
+        calculatedCellSize < 54.dp -> 13.sp
+        else -> 16.sp
+    }
 
     Column(
         modifier = Modifier
@@ -683,8 +710,9 @@ fun RectangularMatricesScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Настройка строк и столбцов
+        // МГНОВЕННАЯ НАСТРОЙКА СТРОК И СТОЛБЦОВ ДО 7x7
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Карточка Строк
             Card(
                 modifier = Modifier.weight(1f),
                 colors = CardDefaults.cardColors(containerColor = CardDark),
@@ -694,17 +722,30 @@ fun RectangularMatricesScreen(
                     Text("Строк (M)", color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                        CounterButton(symbol = "−", enabled = curRows > 1, onClick = {
-                            if (selectedTab == 0) onSizeAChange(rowsA - 1, colsA) else onSizeBChange(rowsB - 1, colsB)
-                        })
+                        CounterButton(
+                            symbol = "−",
+                            enabled = curRows > 1,
+                            onClick = {
+                                if (curRows > 1) {
+                                    if (selectedTab == 0) onSizeAChange(rowsA - 1, colsA) else onSizeBChange(rowsB - 1, colsB)
+                                }
+                            }
+                        )
                         Text(text = "$curRows", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 14.dp))
-                        CounterButton(symbol = "+", enabled = curRows < 6, onClick = {
-                            if (selectedTab == 0) onSizeAChange(rowsA + 1, colsA) else onSizeBChange(rowsB + 1, colsB)
-                        })
+                        CounterButton(
+                            symbol = "+",
+                            enabled = curRows < 7,
+                            onClick = {
+                                if (curRows < 7) {
+                                    if (selectedTab == 0) onSizeAChange(rowsA + 1, colsA) else onSizeBChange(rowsB + 1, colsB)
+                                }
+                            }
+                        )
                     }
                 }
             }
 
+            // Карточка Столбцов
             Card(
                 modifier = Modifier.weight(1f),
                 colors = CardDefaults.cardColors(containerColor = CardDark),
@@ -714,13 +755,25 @@ fun RectangularMatricesScreen(
                     Text("Столбцов (N)", color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                     Spacer(modifier = Modifier.height(6.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
-                        CounterButton(symbol = "−", enabled = curCols > 1, onClick = {
-                            if (selectedTab == 0) onSizeAChange(rowsA, colsA - 1) else onSizeBChange(rowsB, colsB - 1)
-                        })
+                        CounterButton(
+                            symbol = "−",
+                            enabled = curCols > 1,
+                            onClick = {
+                                if (curCols > 1) {
+                                    if (selectedTab == 0) onSizeAChange(rowsA, colsA - 1) else onSizeBChange(rowsB, colsB - 1)
+                                }
+                            }
+                        )
                         Text(text = "$curCols", color = TextWhite, fontSize = 16.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 14.dp))
-                        CounterButton(symbol = "+", enabled = curCols < 6, onClick = {
-                            if (selectedTab == 0) onSizeAChange(rowsA, colsA + 1) else onSizeBChange(rowsB, colsB + 1)
-                        })
+                        CounterButton(
+                            symbol = "+",
+                            enabled = curCols < 7,
+                            onClick = {
+                                if (curCols < 7) {
+                                    if (selectedTab == 0) onSizeAChange(rowsA, colsA + 1) else onSizeBChange(rowsB, colsB + 1)
+                                }
+                            }
+                        )
                     }
                 }
             }
@@ -745,7 +798,6 @@ fun RectangularMatricesScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Сетка ввода
         MatrixGridInput(
             rows = curRows,
             cols = curCols,
@@ -767,7 +819,7 @@ fun RectangularMatricesScreen(
                 onClick = { updateCurrent(List(curRows) { List(curCols) { Random.nextInt(-9, 10).toString() } }) },
                 colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0xFF1E293B)),
                 shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) { Text("Рандом", color = TextWhite, fontSize = 11.sp) }
 
             FilledTonalButton(
@@ -795,7 +847,7 @@ fun RectangularMatricesScreen(
                 onClick = { updateCurrent(List(curRows) { List(curCols) { "0" } }) },
                 colors = ButtonDefaults.filledTonalButtonColors(containerColor = Color(0xFF1E293B)),
                 shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
             ) { Text("Очистить", color = Color(0xFFF87171), fontSize = 11.sp) }
         }
 
@@ -970,9 +1022,8 @@ fun RectangularMatricesScreen(
         )
     }
 }
-
 // -------------------------------------------------------------
-// ШТОРКА ИСТОРИИ (С КНОПКАМИ БЫСТРОГО ПЕРЕНОСА)
+// ШТОРКА ИСТОРИИ
 // -------------------------------------------------------------
 @Composable
 fun HistoryBottomSheetContent(
@@ -1052,7 +1103,6 @@ fun HistoryBottomSheetContent(
                         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF24334D))
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            // Заголовок и копирование
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1090,11 +1140,9 @@ fun HistoryBottomSheetContent(
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Отрисовка: матрица или текст
                             if (item.resultMatrix != null) {
                                 HistoryMatrixGrid(item.resultMatrix)
 
-                                // Кнопки быстрого встраивания в A, B или C прямо из истории!
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -1147,7 +1195,7 @@ fun HistoryBottomSheetContent(
 }
 
 // -------------------------------------------------------------
-// ВСПОМОГАТЕЛЬНЫЕ КОМПОНЕНТЫ И ФУНКЦИИ
+// КОМПОНЕНТЫ И ФУНКЦИИ ВЫРАВНИВАНИЯ
 // -------------------------------------------------------------
 @Composable
 fun HistoryMatrixGrid(matrix: Array<DoubleArray>) {
@@ -1213,37 +1261,21 @@ fun CounterButton(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
-    var isPressed by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
-    val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.85f else 1f,
-        animationSpec = spring(dampingRatio = 0.5f, stiffness = 500f),
-        label = "counterScale"
-    )
 
     Box(
         modifier = Modifier
-            .size(32.dp)
-            .scale(scale)
+            .size(34.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(Color.Transparent)
+            .background(if (enabled) Color(0xFF1E293B) else Color.Transparent)
             .border(
                 width = 1.dp,
-                color = if (enabled) Color(0xFF334155) else Color(0xFF1E293B),
+                color = if (enabled) AccentCyan.copy(alpha = 0.5f) else Color(0xFF24334D),
                 shape = RoundedCornerShape(8.dp)
             )
-            .pointerInput(enabled) {
-                if (enabled) {
-                    detectTapGestures(
-                        onPress = {
-                            isPressed = true
-                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                            tryAwaitRelease()
-                            isPressed = false
-                        },
-                        onTap = { onClick() }
-                    )
-                }
+            .clickable(enabled = enabled) {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
             },
         contentAlignment = Alignment.Center
     ) {
@@ -1256,7 +1288,6 @@ fun CounterButton(
         )
     }
 }
-
 @Composable
 fun TabButton(text: String, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
@@ -1279,6 +1310,7 @@ fun TabButton(text: String, selected: Boolean, modifier: Modifier = Modifier, on
     }
 }
 
+// Чистая ячейка с динамическим размером шрифта
 @Composable
 fun MatrixGridInput(
     rows: Int,
@@ -1286,7 +1318,7 @@ fun MatrixGridInput(
     data: List<List<String>>,
     accentColor: Color,
     cellSize: Dp,
-    fontSize: androidx.compose.ui.unit.TextUnit, // базовый размер
+    fontSize: androidx.compose.ui.unit.TextUnit,
     onValueChange: (Int, Int, String) -> Unit
 ) {
     Row(
@@ -1296,7 +1328,6 @@ fun MatrixGridInput(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Левая скобка [
         Box(
             modifier = Modifier
                 .height((rows * cellSize.value * 0.95f).dp)
@@ -1316,17 +1347,16 @@ fun MatrixGridInput(
                         val cellVal = if (i < data.size && j < data[i].size) data[i][j] else "0"
                         var isFocused by remember { mutableStateOf(false) }
 
-                        // Динамический расчет размера шрифта: длинные дроби уменьшаем!
                         val dynamicFontSize = when {
-                            cellVal.length > 5 -> 10.5.sp
-                            cellVal.length > 3 -> 12.5.sp
-                            else -> 15.sp
+                            cellVal.length > 5 -> 10.sp
+                            cellVal.length > 3 -> 12.sp
+                            else -> fontSize
                         }
 
                         Box(
                             modifier = Modifier
                                 .size(cellSize)
-                                .padding(2.5.dp)
+                                .padding(2.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(CardDark)
                                 .border(
@@ -1362,15 +1392,14 @@ fun MatrixGridInput(
                                 cursorBrush = SolidColor(accentColor),
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(horizontal = 2.dp) // Минимальные отступы чтобы всё влезало!
+                                    .padding(horizontal = 2.dp)
                             )
 
-                            // Плейсхолдер если пусто
                             if (cellVal.isEmpty()) {
                                 Text(
                                     text = "0",
                                     color = TextDim.copy(alpha = 0.4f),
-                                    fontSize = 14.sp,
+                                    fontSize = 13.sp,
                                     textAlign = TextAlign.Center
                                 )
                             }
@@ -1381,7 +1410,6 @@ fun MatrixGridInput(
         }
 
         Spacer(modifier = Modifier.width(4.dp))
-        // Правая скобка ]
         Box(
             modifier = Modifier
                 .height((rows * cellSize.value * 0.95f).dp)
@@ -1517,7 +1545,7 @@ fun ResultCardBlock(
 fun MatrixResultGridAdaptive(matrix: Array<DoubleArray>, screenWidth: Dp) {
     val rows = matrix.size
     val cols = matrix[0].size
-    val colWidth = ((screenWidth - 60.dp) / cols).coerceIn(48.dp, 75.dp)
+    val colWidth = ((screenWidth - 60.dp) / cols).coerceIn(44.dp, 75.dp)
 
     Row(
         modifier = Modifier
@@ -1544,7 +1572,7 @@ fun MatrixResultGridAdaptive(matrix: Array<DoubleArray>, screenWidth: Dp) {
                             Text(
                                 text = formatNumber(matrix[i][j]),
                                 color = TextWhite,
-                                fontSize = if (colWidth < 55.dp) 12.sp else 14.sp,
+                                fontSize = if (colWidth < 50.dp) 11.sp else 13.sp,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.SemiBold,
                                 textAlign = TextAlign.Center,
@@ -1609,31 +1637,23 @@ fun AdaptiveBtn(text: String, modifier: Modifier = Modifier, highlight: Boolean 
     }
 }
 
-// Умный парсер скопированного текста в матрицу (понимает табы, пробелы, переводы строк)
-// Умный парсер: понимает точки, запятые, любые виды минусов и скобки!
+// Умный парсер скопированного текста: понимает точки, запятые, любые виды минусов и скобок
 fun parsePastedText(text: String, reqRows: Int, reqCols: Int): List<List<String>>? {
     try {
-        // 1. Нормализация текста:
         val normalized = text
-            .replace('−', '-') // Типографский минус -> стандартный
-            .replace('–', '-') // Короткое тире -> стандартный минус
-            .replace('—', '-') // Длинное тире -> стандартный минус
-            .replace(',', '.') // ВСЕ ЗАПЯТЫЕ ПРЕВРАЩАЕМ В ТОЧКИ!
-            .replace("[", " ") // Убираем скобки если скопировали [1 2; 3 4]
+            .replace('−', '-')
+            .replace('–', '-')
+            .replace('—', '-')
+            .replace(',', '.')
+            .replace("[", " ")
             .replace("]", " ")
             .trim()
 
         val rawLines = normalized.lines().filter { it.isNotBlank() }
-        val allNumbers = mutableListOf<String>()
-
-        // 2. Извлекаем все валидные числа (целые и с плавающей точкой)
         val numberRegex = Regex("-?\\d+(\\.\\d+)?")
-
-        // Проверяем: это многострочный текст или всё в одну строчку
         val result = mutableListOf<List<String>>()
 
         if (rawLines.size >= reqRows) {
-            // Построчный разбор (из таблицы или истории)
             for (i in 0 until reqRows) {
                 val rowList = mutableListOf<String>()
                 val matches = numberRegex.findAll(rawLines[i]).map { it.value }.toList()
@@ -1647,7 +1667,6 @@ fun parsePastedText(text: String, reqRows: Int, reqCols: Int): List<List<String>
                 result.add(rowList)
             }
         } else {
-            // Если скопировали сплошным потоком чисел через пробелы
             val matches = numberRegex.findAll(normalized).map { it.value }.toList()
             var index = 0
             for (i in 0 until reqRows) {
@@ -1702,4 +1721,3 @@ fun formatMatrixRaw(matrix: Array<DoubleArray>): String {
         row.joinToString("\t") { v -> formatNumber(v) }
     }
 }
-// Умный парсер: понимает точки, запятые, любые виды минусов и скобки!
