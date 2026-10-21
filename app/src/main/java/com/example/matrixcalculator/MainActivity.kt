@@ -267,13 +267,13 @@ fun MainAppSwitcher() {
                     historyList = historyList,
                     onClearHistory = { clearAllHistory() },
                     onPasteToSquareA = {
-                        squareSize = it.size; squareMatrixA = matrixToStringList(it); showHistorySheet = false
+                        squareSize = it.size; squareMatrixA = matrixToPreciseStringList(it); showHistorySheet = false
                     },
                     onPasteToSquareB = {
-                        squareSize = it.size; squareMatrixB = matrixToStringList(it); showHistorySheet = false
+                        squareSize = it.size; squareMatrixB = matrixToPreciseStringList(it); showHistorySheet = false
                     },
                     onPasteToSquareC = {
-                        squareSize = it.size; squareMatrixC = matrixToStringList(it); showHistorySheet = false
+                        squareSize = it.size; squareMatrixC = matrixToPreciseStringList(it); showHistorySheet = false
                     }
                 )
             }
@@ -488,7 +488,7 @@ fun SquareMatricesScreen(
 
         ResultCardBlock(
             lastResultMatrix = lastResultMatrix, lastResultGrid = lastResultGrid, resultScalarText = resultScalarText, isError = isError, screenWidth = screenWidth, context = context,
-            onTransferToA = { onMatrixAChange(matrixToStringList(it)) }, onTransferToB = { onMatrixBChange(matrixToStringList(it)) }, onTransferToC = { onMatrixCChange(matrixToStringList(it)) }
+            onTransferToA = { onMatrixAChange(matrixToPreciseStringList(it)) }, onTransferToB = { onMatrixBChange(matrixToPreciseStringList(it)) }, onTransferToC = { onMatrixCChange(matrixToPreciseStringList(it)) }
         )
     }
 }
@@ -667,8 +667,8 @@ fun RectangularMatricesScreen(
 
         ResultCardBlock(
             lastResultMatrix = lastResultMatrix, lastResultGrid = null, resultScalarText = resultScalarText, isError = isError, screenWidth = screenWidth, context = context,
-            onTransferToA = { onSizeAChange(it.size, it[0].size); onMatrixAChange(matrixToStringList(it)) },
-            onTransferToB = { onSizeBChange(it.size, it[0].size); onMatrixBChange(matrixToStringList(it)) },
+            onTransferToA = { onSizeAChange(it.size, it[0].size); onMatrixAChange(matrixToPreciseStringList(it)) },
+            onTransferToB = { onSizeBChange(it.size, it[0].size); onMatrixBChange(matrixToPreciseStringList(it)) },
             onTransferToC = null
         )
     }
@@ -915,23 +915,27 @@ fun parsePastedText(text: String, reqRows: Int, reqCols: Int): List<List<String>
 fun resizeMatrix(old: List<List<String>>, newR: Int, newC: Int): List<List<String>> { return List(newR) { r -> List(newC) { c -> if (r < old.size && c < old[r].size) old[r][c] else "0" } } }
 fun parse(data: List<List<String>>): Array<DoubleArray> { val r = data.size; val c = if (r > 0) data[0].size else 0; return Array(r) { i -> DoubleArray(c) { j -> data[i][j].toDoubleOrNull() ?: 0.0 } } }
 fun matrixToStringList(matrix: Array<DoubleArray>): List<List<String>> { return matrix.map { row -> row.map { formatNumber(it) } } }
+fun formatPreciseNumber(v: Double): String {
+    val clean = if (abs(v) < 1e-12) 0.0 else v
+    return if (clean % 1.0 == 0.0) clean.toInt().toString() else String.format(Locale.US, "%.7f", clean).trimEnd('0').trimEnd('.')
+}
+
+// Красивый формат для ВЫВОДА НА ЭКРАН (округляем до 3 знаков)
 fun formatNumber(v: Double): String {
-    // 1. Если число безумно близко к целому (например 0.999 или 1.001) -> притягиваем к целому!
-    val nearestInt = Math.round(v).toDouble()
-    val valueToFormat = if (abs(v - nearestInt) < 0.005) {
-        nearestInt
+    val clean = if (abs(v) < 1e-12) 0.0 else v
+    val rounded = Math.round(clean * 1000.0) / 1000.0
+    return if (rounded % 1.0 == 0.0) {
+        rounded.toInt().toString()
     } else {
-        v
-    }
-
-    // 2. Убираем микро-ноль (-0.0 превращаем в 0.0)
-    val clean = if (abs(valueToFormat) < 1e-9) 0.0 else valueToFormat
-
-    // 3. Выводим целое без точки, а дробное - максимум до 3 знаков
-    return if (clean % 1.0 == 0.0) {
-        clean.toInt().toString()
-    } else {
-        String.format(Locale.US, "%.3f", clean).trimEnd('0').trimEnd('.')
+        String.format(Locale.US, "%.3f", rounded).trimEnd('0').trimEnd('.')
     }
 }
-fun formatMatrixRaw(matrix: Array<DoubleArray>): String { return matrix.joinToString("\n") { row -> row.joinToString("\t") { v -> formatNumber(v) } } }
+// Перенос матриц теперь использует ВЫСОКУЮ ТОЧНОСТЬ
+fun matrixToPreciseStringList(matrix: Array<DoubleArray>): List<List<String>> {
+    return matrix.map { row -> row.map { formatPreciseNumber(it) } }
+}
+fun formatMatrixRaw(matrix: Array<DoubleArray>): String {
+    return matrix.joinToString("\n") { row ->
+        row.joinToString("\t") { v -> formatNumber(v) }
+    }
+}
