@@ -915,9 +915,23 @@ fun parsePastedText(text: String, reqRows: Int, reqCols: Int): List<List<String>
 fun resizeMatrix(old: List<List<String>>, newR: Int, newC: Int): List<List<String>> { return List(newR) { r -> List(newC) { c -> if (r < old.size && c < old[r].size) old[r][c] else "0" } } }
 fun parse(data: List<List<String>>): Array<DoubleArray> { val r = data.size; val c = if (r > 0) data[0].size else 0; return Array(r) { i -> DoubleArray(c) { j -> data[i][j].toDoubleOrNull() ?: 0.0 } } }
 fun matrixToStringList(matrix: Array<DoubleArray>): List<List<String>> { return matrix.map { row -> row.map { formatNumber(it) } } }
+// Умный перенос: если число из-за погрешностей дробей стало 1.0000002 или 2.9999998 -> превращаем в идеальное 1 или 3!
 fun formatPreciseNumber(v: Double): String {
-    val clean = if (abs(v) < 1e-12) 0.0 else v
-    return if (clean % 1.0 == 0.0) clean.toInt().toString() else String.format(Locale.US, "%.7f", clean).trimEnd('0').trimEnd('.')
+    // 1. Проверяем, не является ли число практически целым
+    val nearestInt = Math.round(v).toDouble()
+    val clean = if (abs(v - nearestInt) < 0.005) {
+        nearestInt // Схлопываем копейки в целое число!
+    } else {
+        if (abs(v) < 1e-12) 0.0 else v
+    }
+
+    // 2. Если получилось целое — пишем красиво без нулей и точек
+    return if (clean % 1.0 == 0.0) {
+        clean.toInt().toString()
+    } else {
+        // Если это честная дробь — оставляем точность для математики, но без хвостов
+        String.format(Locale.US, "%.5f", clean).trimEnd('0').trimEnd('.')
+    }
 }
 
 // Красивый формат для ВЫВОДА НА ЭКРАН (округляем до 3 знаков)
