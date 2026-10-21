@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Matrix Lab — Professional Edition</title>
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Matrix Lab">
+
+    <style>
+        :root {
+            --bg-dark: #090D16;
+            --card-dark: #131D2E;
+            --accent-cyan: #06B6D4;
+            --accent-purple: #8B5CF6;
+            --accent-amber: #F59E0B;
+            --accent-emerald: #10B981;
+            --text-white: #F1F5F9;
+            --text-dim: #64748B;
+            --border-color: #24334D;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background: linear-gradient(180deg, var(--bg-dark) 0%, #030712 100%);
+            color: var(--text-white);
+            min-height: 100vh;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 6px;
+        }
+        .header h1 { font-size: 24px; font-weight: 900; letter-spacing: 1.5px; }
+        .header p { font-size: 11px; color: var(--accent-cyan); font-weight: 600; }
+
+        .btn-history-badge {
+            background: var(--card-dark);
+            border: 1px solid var(--border-color);
+            color: var(--accent-cyan);
+            padding: 6px 12px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+        }
+
+        .mode-switcher {
+            background: var(--card-dark);
+            border-radius: 14px;
+            padding: 4px;
+            display: flex;
+            gap: 4px;
+        }
+        .btn-mode {
+            flex: 1;
+            padding: 10px 4px;
+            text-align: center;
+            font-size: 12.5px;
+            font-weight: bold;
+            color: var(--text-dim);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-mode.active {
+            background: rgba(6, 182, 212, 0.2);
+            color: var(--accent-cyan);
+            border: 1px solid var(--accent-cyan);
+        }
+
+        .panel {
+            background: var(--card-dark);
+            border-radius: 14px;
+            padding: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border: 1px solid var(--border-color);
+        }
+        .tabs { display: flex; gap: 4px; }
+        .tab {
+            padding: 6px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+        .tab.active-a { background: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
+        .tab.active-b { background: rgba(139, 92, 246, 0.15); color: var(--accent-purple); border: 1px solid var(--accent-purple); }
+        .tab.active-c { background: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
+
+        .btn-counter {
+            width: 32px; height: 32px;
+            background: #1E293B;
+            border: 1px solid var(--border-color);
+            color: var(--text-white);
+            border-radius: 8px;
+            font-size: 16px; font-weight: bold;
+            display: flex; justify-content: center; align-items: center;
+            cursor: pointer; user-select: none;
+        }
+        .btn-counter:active { transform: scale(0.9); }
+
+        .dim-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .dim-card {
+            background: var(--card-dark);
+            border-radius: 12px; padding: 10px;
+            text-align: center; display: flex; flex-direction: column; align-items: center; gap: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .matrix-box {
+            display: flex; justify-content: center; align-items: center;
+            gap: 8px; margin: 10px 0; overflow-x: auto; padding: 6px;
+        }
+        .bracket { width: 5px; border-radius: 4px; align-self: stretch; }
+        .grid { display: grid; gap: 6px; }
+        
+        .matrix-cell {
+            width: 50px; height: 50px;
+            background: var(--card-dark) !important;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-white) !important;
+            font-size: 14px; font-weight: 600;
+            text-align: center;
+            outline: none;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+        .matrix-cell:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.4);
+        }
+
+        .util-buttons { display: flex; gap: 8px; justify-content: center; }
+        .btn-util {
+            background: #1E293B; border: 1px solid var(--border-color); color: var(--text-white);
+            padding: 8px 14px; border-radius: 10px; font-size: 11.5px; font-weight: bold; cursor: pointer;
+        }
+        .btn-util.paste { color: var(--accent-cyan); background: rgba(6, 182, 212, 0.15); }
+        .btn-util.clear { color: #F87171; background: rgba(248, 113, 113, 0.1); }
+
+        .section-title { font-size: 11.5px; color: var(--text-dim); margin-top: 6px; font-weight: 600; }
+        .btn-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .btn-row.two-col { grid-template-columns: repeat(2, 1fr); }
+        .btn-op {
+            background: var(--card-dark); border: 1px solid var(--border-color);
+            color: var(--text-white); padding: 11px 4px; border-radius: 10px;
+            font-size: 11.5px; font-weight: bold; cursor: pointer; text-align: center;
+            transition: 0.1s;
+        }
+        .btn-op:active { transform: scale(0.96); }
+        .btn-op.highlight { border-color: rgba(6, 182, 212, 0.5); background: #1E293B; }
+
+        .result-card {
+            background: var(--card-dark); border: 1px solid var(--accent-emerald);
+            border-radius: 16px; padding: 16px; margin-top: 10px; display: none; flex-direction: column; gap: 10px;
+        }
+        .result-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: var(--accent-emerald); }
+        .result-content { font-family: monospace; font-size: 14px; white-space: pre-wrap; line-height: 1.6; text-align: center; overflow-x: auto; }
+        .result-transfer { display: flex; gap: 6px; border-top: 1px solid var(--border-color); padding-top: 10px; }
+        .btn-transfer { flex: 1; padding: 8px; border-radius: 8px; font-size: 11.5px; font-weight: bold; background: transparent; cursor: pointer; }
+        .btn-transfer.a { border: 1px solid var(--accent-cyan); color: var(--accent-cyan); background: rgba(6, 182, 212, 0.1); }
+        .btn-transfer.b { border: 1px solid var(--accent-purple); color: var(--accent-purple); background: rgba(139, 92, 246, 0.1); }
+        .btn-transfer.c { border: 1px solid var(--accent-amber); color: var(--accent-amber); background: rgba(245, 158, 11, 0.1); }
+
+        .modal {
+            position: fixed; bottom: 0; left: 0; right: 0;
+            background: var(--card-dark); border-top: 1px solid var(--border-color);
+            border-radius: 20px 20px 0 0; padding: 20px; max-height: 75vh; overflow-y: auto; display: none; z-index: 100;
+        }
+        .history-item {
+            background: #0F172A; border: 1px solid var(--border-color);
+            padding: 12px; border-radius: 12px; margin-bottom: 10px; font-family: monospace; font-size: 12.5px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <div>
+            <h1>MATRIX LAB</h1>
+            <p>Theory of Control • Web & iOS Edition</p>
+        </div>
+        <button class="btn-history-badge" onclick="toggleHistory()">🕒 <span id="hist-count">0</span></button>
+    </div>
+
+    <div class="mode-switcher">
+        <div class="btn-mode active" id="mode-sq" onclick="switchMode(0)">Квадратные (A, B, C)</div>
+        <div class="btn-mode" id="mode-rect" onclick="switchMode(1)">Прямоугольные / Векторы</div>
+    </div>
+
+    <!-- ЭКРАН 1: КВАДРАТНЫЕ -->
+    <div id="screen-square">
+        <div class="panel">
+            <div class="tabs">
+                <div class="tab active-a" id="tab-sq-0" onclick="switchSqTab(0)">A</div>
+                <div class="tab" id="tab-sq-1" onclick="switchSqTab(1)">B</div>
+                <div class="tab" id="tab-sq-2" onclick="switchSqTab(2)">C</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <div class="btn-counter" onclick="changeSqSize(-1)">−</div>
+                <span id="sq-size-label" style="font-weight: bold; font-size: 14px;">3×3</span>
+                <div class="btn-counter" onclick="changeSqSize(1)">+</div>
+            </div>
+        </div>
+
+        <div class="matrix-box">
+            <div class="bracket" id="sq-bracket-l" style="background:var(--accent-cyan);"></div>
+            <div class="grid" id="sq-matrix-grid"></div>
+            <div class="bracket" id="sq-bracket-r" style="background:var(--accent-cyan);"></div>
+        </div>
+
+        <div class="util-buttons">
+            <button class="btn-util" onclick="fillSqRandom()">Рандом</button>
+            <button class="btn-util paste" onclick="pasteSq()">Вставить</button>
+            <button class="btn-util clear" onclick="clearSq()">Очистить</button>
+        </div>
+
+        <div class="section-title">Спектральный анализ (ТАУ):</div>
+        <div class="btn-row" style="grid-template-columns: repeat(3, 1fr);">
+            <button class="btn-op highlight" onclick="calcEigenvalues()">λ_i (Числа)</button>
+            <button class="btn-op highlight" onclick="calcEigenvectors()">v_i (Векторы)</button>
+            <button class="btn-op highlight" onclick="calcJordan()">ЖНФ</button>
+        </div>
+
+        <div class="section-title">Тройные операции (A, B, C):</div>
+        <div class="btn-row">
+            <button class="btn-op highlight" onclick="calcTripleAdd()">A + B + C</button>
+            <button class="btn-op highlight" onclick="calcTripleSub()">A - B - C</button>
+            <button class="btn-op highlight" onclick="calcTripleMul()">A × B × C</button>
+        </div>
+
+        <div class="section-title">Операции A и B:</div>
+        <div class="btn-row">
+            <button class="btn-op" onclick="calcAdd()">A + B</button>
+            <button class="btn-op" onclick="calcSub()">A - B</button>
+            <button class="btn-op" onclick="calcMul()">A × B</button>
+        </div>
+
+        <div class="section-title">Операции над выбранной:</div>
+        <div class="btn-row two-col">
+            <button class="btn-op" onclick="calcInverse()">A⁻¹ (Обратная)</button>
+            <button class="btn-op" onclick="calcTranspose()">Aᵀ (Трансп.)</button>
+        </div>
+        <div class="btn-row two-col" style="margin-top: 6px;">
+            <button class="btn-op" onclick="calcDet()">det (Определитель)</button>
+            <button class="btn-op" onclick="calcRank()">Ранг (Rank)</button>
+        </div>
+        <div class="btn-row two-col" style="margin-top: 6px;">
+            <button class="btn-op" onclick="calcTrace()">След Tr(A)</button>
+            <button class="btn-op highlight" onclick="calcNorm()">‖A‖_F Норма</button>
+        </div>
+    </div>
+
+    <!-- ЭКРАН 2: ПРЯМОУГОЛЬНЫЕ -->
+    <div id="screen-rect" style="display:none;">
+        <div class="panel">
+            <div class="tabs" style="flex:1;">
+                <div class="tab active-a" id="tab-rc-0" style="flex:1; text-align:center;" onclick="switchRcTab(0)">Матрица A</div>
+                <div class="tab" id="tab-rc-1" style="flex:1; text-align:center;" onclick="switchRcTab(1)">Матрица B</div>
+            </div>
+            <button class="btn-util" style="margin-left:8px;" onclick="swapRectMatrices()">A ⇄ B</button>
+        </div>
+
+        <div class="dim-cards" style="margin-top:8px;">
+            <div class="dim-card">
+                <span class="section-title" style="margin:0;">Строк (M)</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="btn-counter" onclick="changeRcRows(-1)">−</div>
+                    <span id="rc-rows-label" style="font-weight:bold; font-size:16px;">2</span>
+                    <div class="btn-counter" onclick="changeRcRows(1)">+</div>
+                </div>
+            </div>
+            <div class="dim-card">
+                <span class="section-title" style="margin:0;">Столбцов (N)</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <div class="btn-counter" onclick="changeRcCols(-1)">−</div>
+                    <span id="rc-cols-label" style="font-weight:bold; font-size:16px;">3</span>
+                    <div class="btn-counter" onclick="changeRcCols(1)">+</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="matrix-box">
+            <div class="bracket" id="rc-bracket-l" style="background:var(--accent-cyan);"></div>
+            <div class="grid" id="rc-matrix-grid"></div>
+            <div class="bracket" id="rc-bracket-r" style="background:var(--accent-cyan);"></div>
+        </div>
+
+        <div class="util-buttons">
+            <button class="btn-util" onclick="fillRcRandom()">Рандом</button>
+            <button class="btn-util paste" onclick="pasteRc()">Вставить</button>
+            <button class="btn-util clear" onclick="clearRc()">Очистить</button>
+        </div>
+
+        <div class="section-title">Матричные операции над A и B:</div>
+        <div class="btn-row">
+            <button class="btn-op highlight" onclick="calcRcMul()">A × B</button>
+            <button class="btn-op" onclick="calcRcAdd()">A + B</button>
+            <button class="btn-op" onclick="calcRcSub()">A - B</button>
+        </div>
+
+        <div class="section-title">Векторные операции:</div>
+        <div class="btn-row two-col">
+            <button class="btn-op" onclick="calcDotProduct()">a · b (Скалярное)</button>
+            <button class="btn-op" onclick="calcCrossProduct()">a ⨯ b (Векторное 3D)</button>
+        </div>
+    </div>
+
+    <!-- РЕЗУЛЬТАТ -->
+    <div class="result-card" id="result-card">
+        <div class="result-header">
+            <span>Результат:</span>
+            <span style="cursor: pointer; color: var(--text-dim);" onclick="copyResult()">Копировать 📋</span>
+        </div>
+        <div class="result-content" id="result-text"></div>
+        <div class="section-title" id="transfer-title">Перенести результат в:</div>
+        <div class="result-transfer" id="transfer-block">
+            <button class="btn-transfer a" onclick="transferResult(0)">➔ в A</button>
+            <button class="btn-transfer b" onclick="transferResult(1)">➔ в B</button>
+            <button class="btn-transfer c" id="btn-trans-c" onclick="transferResult(2)">➔ в C</button>
+        </div>
+    </div>
+</div>
+
+<!-- ИСТОРИЯ -->
+<div class="modal" id="history-modal">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 14px;">
+        <h3 style="font-size: 17px;">История вычислений</h3>
+        <button class="btn-util clear" onclick="clearHistory()">Очистить</button>
+    </div>
+    <div id="history-list"></div>
+    <button class="btn-op" style="width: 100%; margin-top: 12px; padding: 12px;" onclick="toggleHistory()">Закрыть</button>
+</div>
+
+<script>
+    class Complex {
+        constructor(re, im = 0) { this.re = re; this.im = im; }
+        add(c) { return new Complex(this.re + c.re, this.im + c.im); }
+        sub(c) { return new Complex(this.re - c.re, this.im - c.im); }
+        mul(c) { return new Complex(this.re * c.re - this.im * c.im, this.re * c.im + this.im * c.re); }
+        div(c) {
+            const d = c.re * c.re + c.im * c.im;
+            if (Math.abs(d) < 1e-12) return new Complex(0, 0);
+            return new Complex((this.re * c.re + this.im * c.im) / d, (this.im * c.re - this.re * c.im) / d);
+        }
+        abs() { return Math.hypot(this.re, this.im); }
+        toString() {
+            const r = Math.abs(this.re) < 1e-4 ? 0 : this.re;
+            const i = Math.abs(this.im) < 1e-4 ? 0 : this.im;
+            if (i === 0) return formatNum(r);
+            if (r === 0) return `${formatNum(i)}i`;
+            return i > 0 ? `${formatNum(r)} + ${formatNum(i)}i` : `${formatNum(r)} - ${formatNum(Math.abs(i))}i`;
+        }
+    }
+
+    let currentMode = 0;
+    let history = JSON.parse(localStorage.getItem('matrix_history') || '[]');
+    let lastResultMatrix = null;
+
+    let sqSize = 3, sqTab = 0;
+    let sqMatrices = [createEmpty(3,3), createEmpty(3,3), createEmpty(3,3)];
+    let rcTab = 0, rcRowsA = 2, rcColsA = 3, rcRowsB = 3, rcColsB = 2;
+    let rcMatrixA = createEmpty(2, 3), rcMatrixB = createEmpty(3, 2);
+
+    function createEmpty(r, c) { return Array(r).fill(0).map(() => Array(c).fill(0)); }
+
+    function switchMode(mode) {
+        currentMode = mode;
+        document.getElementById('mode-sq').classList.toggle('active', mode === 0);
+        document.getElementById('mode-rect').classList.toggle('active', mode === 1);
+        document.getElementById('screen-square').style.display = mode === 0 ? 'block' : 'none';
+        document.getElementById('screen-rect').style.display = mode === 1 ? 'block' : 'none';
+        document.getElementById('btn-trans-c').style.display = mode === 0 ? 'block' : 'none';
+        document.getElementById('result-card').style.display = 'none';
+        if (mode === 0) renderSq(); else renderRc();
+    }
+
+    function renderSq() {
+        const grid = document.getElementById('sq-matrix-grid');
+        grid.style.gridTemplateColumns = `repeat(${sqSize}, 1fr)`;
+        grid.innerHTML = '';
+        const data = sqMatrices[sqTab];
+        for (let i = 0; i < sqSize; i++) {
+            for (let j = 0; j < sqSize; j++) {
+                const input = document.createElement('input');
+                input.type = 'number'; input.className = 'matrix-cell';
+                input.value = data[i][j];
+                input.onfocus = () => { if (input.value === '0') input.value = ''; };
+                input.onblur = () => { if (input.value === '') input.value = '0'; };
+                input.oninput = (e) => { sqMatrices[sqTab][i][j] = parseFloat(e.target.value) || 0; };
+                grid.appendChild(input);
+            }
+        }
+        document.getElementById('sq-size-label').innerText = `${sqSize}×${sqSize}`;
+        const color = sqTab === 0 ? 'var(--accent-cyan)' : (sqTab === 1 ? 'var(--accent-purple)' : 'var(--accent-amber)');
+        document.getElementById('sq-bracket-l').style.background = color;
+        document.getElementById('sq-bracket-r').style.background = color;
+    }
+
+    function switchSqTab(tab) {
+        sqTab = tab;
+        for (let i = 0; i < 3; i++) {
+            document.getElementById(`tab-sq-${i}`).className = 'tab' + (i === tab ? (i === 0 ? ' active-a' : (i === 1 ? ' active-b' : ' active-c')) : '');
+        }
+        renderSq();
+    }
+
+    function changeSqSize(delta) {
+        const newSize = sqSize + delta;
+        if (newSize < 2 || newSize > 7) return;
+        for (let m = 0; m < 3; m++) {
+            const next = createEmpty(newSize, newSize);
+            for (let i = 0; i < Math.min(sqSize, newSize); i++) {
+                for (let j = 0; j < Math.min(sqSize, newSize); j++) next[i][j] = sqMatrices[m][i][j] || 0;
+            }
+            sqMatrices[m] = next;
+        }
+        sqSize = newSize;
+        renderSq();
+    }
+
+    function fillSqRandom() {
+        for (let i = 0; i < sqSize; i++) for (let j = 0; j < sqSize; j++) sqMatrices[sqTab][i][j] = Math.floor(Math.random() * 19) - 9;
+        renderSq();
+    }
+    function clearSq() { sqMatrices[sqTab] = createEmpty(sqSize, sqSize); renderSq(); }
+
+    async function pasteSq() {
+        const text = await navigator.clipboard.readText();
+        const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
+        if (!nums) return alert('Числа не найдены!');
+        let idx = 0;
+        for (let i = 0; i < sqSize; i++) {
+            for (let j = 0; j < sqSize; j++) if (idx < nums.length) sqMatrices[sqTab][i][j] = parseFloat(nums[idx++]) || 0;
+        }
+        renderSq();
+    }
+
+    function renderRc() {
+        const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
+        const data = rcTab === 0 ? rcMatrixA : rcMatrixB;
+        const grid = document.getElementById('rc-matrix-grid');
+        grid.style.gridTemplateColumns = `repeat(${c}, 1fr)`;
+        grid.innerHTML = '';
+        for (let i = 0; i < r; i++) {
+            for (let j = 0; j < c; j++) {
+                const input = document.createElement('input');
+                input.type = 'number'; input.className = 'matrix-cell';
+                input.value = data[i][j];
+                input.onfocus = () => { if (input.value === '0') input.value = ''; };
+                input.onblur = () => { if (input.value === '') input.value = '0'; };
+                input.oninput = (e) => {
+                    if (rcTab === 0) rcMatrixA[i][j] = parseFloat(e.target.value) || 0;
+                    else rcMatrixB[i][j] = parseFloat(e.target.value) || 0;
+                };
+                grid.appendChild(input);
+            }
+        }
+        document.getElementById('rc-rows-label').innerText = r;
+        document.getElementById('rc-cols-label').innerText = c;
+    }
+
+    function switchRcTab(tab) {
+        rcTab = tab;
+        document.getElementById('tab-rc-0').className = 'tab' + (tab === 0 ? ' active-a' : '');
+        document.getElementById('tab-rc-1').className = 'tab' + (tab === 1 ? ' active-b' : '');
+        renderRc();
+    }
+    function changeRcRows(d) {
+        if (rcTab === 0) { rcRowsA = Math.min(7, Math.max(1, rcRowsA + d)); rcMatrixA = resize(rcMatrixA, rcRowsA, rcColsA); }
+        else { rcRowsB = Math.min(7, Math.max(1, rcRowsB + d)); rcMatrixB = resize(rcMatrixB, rcRowsB, rcColsB); }
+        renderRc();
+    }
+    function changeRcCols(d) {
+        if (rcTab === 0) { rcColsA = Math.min(7, Math.max(1, rcColsA + d)); rcMatrixA = resize(rcMatrixA, rcRowsA, rcColsA); }
+        else { rcColsB = Math.min(7, Math.max(1, rcColsB + d)); rcMatrixB = resize(rcMatrixB, rcRowsB, rcColsB); }
+        renderRc();
+    }
+    function resize(old, nr, nc) {
+        const next = createEmpty(nr, nc);
+        for (let i = 0; i < Math.min(old.length, nr); i++) for (let j = 0; j < Math.min(old[0].length, nc); j++) next[i][j] = old[i][j] || 0;
+        return next;
+    }
+    function swapRectMatrices() { [rcMatrixA, rcMatrixB] = [rcMatrixB, rcMatrixA]; [rcRowsA, rcRowsB] = [rcRowsB, rcRowsA]; [rcColsA, rcColsB] = [rcColsB, rcColsA]; renderRc(); }
+    function fillRcRandom() {
+        const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
+        for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) { if (rcTab === 0) rcMatrixA[i][j] = Math.floor(Math.random()*19)-9; else rcMatrixB[i][j] = Math.floor(Math.random()*19)-9; }
+        renderRc();
+    }
+    function clearRc() { if (rcTab === 0) rcMatrixA = createEmpty(rcRowsA, rcColsA); else rcMatrixB = createEmpty(rcRowsB, rcColsB); renderRc(); }
+
+    async function pasteRc() {
+        const text = await navigator.clipboard.readText();
+        const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
+        if (!nums) return alert('Числа не найдены!');
+        const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
+        let idx = 0;
+        for (let i = 0; i < r; i++) {
+            for (let j = 0; j < c; j++) {
+                if (idx < nums.length) {
+                    if (rcTab === 0) rcMatrixA[i][j] = parseFloat(nums[idx++]) || 0;
+                    else rcMatrixB[i][j] = parseFloat(nums[idx++]) || 0;
+                }
+            }
+        }
+        renderRc();
+    }
+
+    // -------------------------------------------------------------
+    // ЧЕСТНЫЙ МАТЕМАТИЧЕСКИЙ ДВИЖОК СПЕКТРАЛЬНОГО АНАЛИЗА
+    // -------------------------------------------------------------
+    function getEigenvalues(mat) {
+        const n = mat.length;
+        if (n === 1) return [new Complex(mat[0][0])];
+
+        let a = mat.map(r => [...r]);
+
+        // Хессенберг
+        for (let k = 0; k < n - 2; k++) {
+            let maxIdx = k + 1;
+            for (let i = k + 2; i < n; i++) if (Math.abs(a[i][k]) > Math.abs(a[maxIdx][k])) maxIdx = i;
+            if (Math.abs(a[maxIdx][k]) > 1e-12) {
+                if (maxIdx !== k + 1) {
+                    [a[maxIdx], a[k + 1]] = [a[k + 1], a[maxIdx]];
+                    for (let c = 0; c < n; c++) { const t = a[c][maxIdx]; a[c][maxIdx] = a[c][k + 1]; a[c][k + 1] = t; }
+                }
+                for (let i = k + 2; i < n; i++) {
+                    const factor = a[i][k] / a[k + 1][k];
+                    for (let j = k; j < n; j++) a[i][j] -= factor * a[k + 1][j];
+                    for (let j = 0; j < n; j++) a[j][k + 1] += factor * a[j][i];
+                }
+            }
+        }
+
+        const res = [];
+        let curN = n, iter = 150 * n;
+        while (curN > 1 && iter > 0) {
+            iter--;
+            const l = curN - 1;
+            if (Math.abs(a[l][l - 1]) <= 1e-8 * (Math.abs(a[l - 1][l - 1]) + Math.abs(a[l][l]) + 1e-8)) {
+                res.push(new Complex(a[l][l]));
+                curN--;
+                continue;
+            }
+            if (curN === 2 || Math.abs(a[l - 1][l - 2]) <= 1e-8 * (Math.abs(a[l - 2][l - 2]) + Math.abs(a[l - 1][l - 1]) + 1e-8)) {
+                const tr = a[l - 1][l - 1] + a[l][l];
+                const det = a[l - 1][l - 1] * a[l][l] - a[l][l - 1] * a[l - 1][l];
+                const disc = tr * tr - 4 * det;
+                if (disc >= 0) {
+                    res.push(new Complex((tr + Math.sqrt(disc)) / 2));
+                    res.push(new Complex((tr - Math.sqrt(disc)) / 2));
+                } else {
+                    res.push(new Complex(tr / 2, Math.sqrt(-disc) / 2));
+                    res.push(new Complex(tr / 2, -Math.sqrt(-disc) / 2));
+                }
+                curN -= 2;
+                continue;
+            }
+
+            const shift = a[l][l];
+            for (let i = 0; i < curN; i++) a[i][i] -= shift;
+
+            const cList = new Array(curN - 1), sList = new Array(curN - 1);
+            for (let i = 0; i < curN - 1; i++) {
+                const r = Math.hypot(a[i][i], a[i + 1][i]);
+                if (r > 1e-14) {
+                    cList[i] = a[i][i] / r;
+                    sList[i] = -a[i + 1][i] / r;
+                    for (let j = i; j < curN; j++) {
+                        const t1 = a[i][j], t2 = a[i + 1][j];
+                        a[i][j] = cList[i] * t1 - sList[i] * t2;
+                        a[i + 1][j] = sList[i] * t1 + cList[i] * t2;
+                    }
+                } else { cList[i] = 1; sList[i] = 0; }
+            }
+            for (let i = 0; i < curN - 1; i++) {
+                for (let j = 0; j <= Math.min(i + 2, curN - 1); j++) {
+                    const t1 = a[j][i], t2 = a[j][i + 1];
+                    a[j][i] = cList[i] * t1 - sList[i] * t2;
+                    a[j][i + 1] = sList[i] * t1 + cList[i] * t2;
+                }
+            }
+            for (let i = 0; i < curN; i++) a[i][i] += shift;
+        }
+        if (curN === 1) res.push(new Complex(a[0][0]));
+        while (res.length < n) res.push(new Complex(a[res.length][res.length]));
+        return res.sort((x, y) => y.abs() - x.abs());
+    }
+
+    function getEigenvectors(mat, eigs) {
+        const n = mat.length;
+        const vecs = [];
+
+        for (let lambda of eigs) {
+            // Решаем (A - λI)v = 0 методом Гаусса для комплексных чисел
+            const m = Array(n).fill(0).map((_, i) =>
+                Array(n).fill(0).map((_, j) => (i === j ? new Complex(mat[i][j]).sub(lambda) : new Complex(mat[i][j])))
+            );
+
+            for (let i = 0; i < n - 1; i++) {
+                let maxR = i;
+                for (let k = i + 1; k < n; k++) if (m[k][i].abs() > m[maxR][i].abs()) maxR = k;
+                [m[i], m[maxR]] = [m[maxR], m[i]];
+
+                for (let k = i + 1; k < n; k++) {
+                    if (m[i][i].abs() > 1e-10) {
+                        const factor = m[k][i].div(m[i][i]);
+                        for (let j = i; j < n; j++) m[k][j] = m[k][j].sub(factor.mul(m[i][j]));
+                    }
+                }
+            }
+
+            const v = Array(n).fill(new Complex(0));
+            v[n - 1] = new Complex(1); // свободная переменная
+            for (let i = n - 2; i >= 0; i--) {
+                let sum = new Complex(0);
+                for (let j = i + 1; j < n; j++) sum = sum.add(m[i][j].mul(v[j]));
+                v[i] = m[i][i].abs() > 1e-9 ? new Complex(0).sub(sum).div(m[i][i]) : new Complex(1);
+            }
+
+            let normSq = 0;
+            v.forEach(x => normSq += x.re * x.re + x.im * x.im);
+            const norm = Math.sqrt(normSq) || 1;
+            vecs.push(v.map(x => x.div(new Complex(norm))));
+        }
+        return vecs;
+    }
+
+    // -------------------------------------------------------------
+    // РЕАЛЬНЫЕ ОБРАБОТЧИКИ КНОПОК
+    // -------------------------------------------------------------
+    function calcEigenvalues() {
+        const eigs = getEigenvalues(sqMatrices[sqTab]);
+        const text = eigs.map((c, idx) => `λ_${idx + 1} = ${c.toString()}`).join('\n');
+        showResult(`Собственные числа спектра:\n\n` + text, 'Собственные числа λ_i');
+    }
+
+    function calcEigenvectors() {
+        const mat = sqMatrices[sqTab];
+        const eigs = getEigenvalues(mat);
+        const vecs = getEigenvectors(mat, eigs);
+        const text = vecs.map((v, idx) => `v_${idx + 1} (для λ_${idx + 1}):\n[ ` + v.map(c => c.toString()).join(', ') + ' ]ᵀ').join('\n\n');
+        showResult(`Собственные векторы:\n\n` + text, 'Собственные векторы v_i');
+    }
+
+    function calcJordan() {
+        const n = sqSize;
+        const eigs = getEigenvalues(sqMatrices[sqTab]);
+        const jnf = Array(n).fill(0).map(() => Array(n).fill('0'));
+
+        let hasBlock = false;
+        for (let i = 0; i < n; i++) {
+            jnf[i][i] = eigs[i].toString();
+            // Если есть кратные корни -> ставим единицу над диагональю
+            if (i > 0 && eigs[i].sub(eigs[i - 1]).abs() < 1e-2) {
+                jnf[i - 1][i] = '1';
+                hasBlock = true;
+            }
+        }
+
+        const desc = hasBlock ? "Жорданова нормальная форма (ЖНФ, есть кратные корни):" : "Диагональный вид (Все собственные числа различны):";
+        
+        // Выводим через идеальную HTML-таблицу!
+        lastResultMatrix = null;
+        document.getElementById('result-text').innerHTML = `<div style="font-family:sans-serif; margin-bottom:8px;">${desc}</div>` + formatTableHTML(jnf);
+        document.getElementById('result-card').style.display = 'flex';
+        document.getElementById('transfer-block').style.display = 'none';
+        document.getElementById('transfer-title').style.display = 'none';
+        addHistory('Жорданова форма', desc);
+    }
+    // Вспомогательные функции
+    function formatNum(v) {
+        const nearInt = Math.round(v);
+        const val = Math.abs(v - nearInt) < 0.005 ? nearInt : v;
+        const clean = Math.abs(val) < 1e-9 ? 0 : val;
+        return clean % 1 === 0 ? clean.toString() : clean.toFixed(3);
+    }
+
+    function showResult(text, title, mat = null) {
+        lastResultMatrix = mat;
+        document.getElementById('result-text').innerHTML = text;
+        document.getElementById('result-card').style.display = 'flex';
+        document.getElementById('transfer-block').style.display = mat ? 'flex' : 'none';
+        document.getElementById('transfer-title').style.display = mat ? 'block' : 'none';
+        addHistory(title, text);
+    }
+
+    function addM(a, b) { return a.map((row, i) => row.map((v, j) => v + b[i][j])); }
+    function subM(a, b) { return a.map((row, i) => row.map((v, j) => v - b[i][j])); }
+    function mulM(a, b) {
+        const r1 = a.length, c1 = a[0].length, c2 = b[0].length;
+        const res = createEmpty(r1, c2);
+        for (let i = 0; i < r1; i++) for (let j = 0; j < c2; j++) { let s = 0; for (let k = 0; k < c1; k++) s += a[i][k]*b[k][j]; res[i][j] = s; }
+        return res;
+    }
+
+    function calcSqAdd() { showResult(formatRaw(addM(sqMatrices[0], sqMatrices[1])), 'A + B', addM(sqMatrices[0], sqMatrices[1])); }
+    function calcSqSub() { showResult(formatRaw(subM(sqMatrices[0], sqMatrices[1])), 'A - B', subM(sqMatrices[0], sqMatrices[1])); }
+    function calcSqMul() { showResult(formatRaw(mulM(sqMatrices[0], sqMatrices[1])), 'A × B', mulM(sqMatrices[0], sqMatrices[1])); }
+    function calcTripleAdd() { const r = addM(addM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A + B + C', r); }
+    function calcTripleSub() { const r = subM(subM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A - B - C', r); }
+    function calcTripleMul() { const r = mulM(mulM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A × B × C', r); }
+
+    function calcTranspose() { const m = sqMatrices[sqTab]; const r = m.map((_, i) => m.map(row => row[i])); showResult(formatRaw(r), 'Aᵀ', r); }
+    function calcNorm() { let s = 0; sqMatrices[sqTab].forEach(r => r.forEach(v => s += v*v)); showResult(`‖A‖_F = ${Math.sqrt(s).toFixed(3)}`, 'Норма Фробениуса'); }
+    function calcTrace() { let tr = 0; for(let i=0;i<sqSize;i++) tr += sqMatrices[sqTab][i][i]; showResult(`Tr(A) = ${formatNum(tr)}`, 'След Tr(A)'); }
+    function calcDet() {
+        const a = sqMatrices[sqTab].map(r => [...r]); let det = 1;
+        for (let i = 0; i < sqSize; i++) {
+            let p = i; for (let j = i+1; j < sqSize; j++) if (Math.abs(a[j][i]) > Math.abs(a[p][i])) p = j;
+            if (Math.abs(a[p][i]) < 1e-12) return showResult('det(A) = 0', 'Определитель');
+            if (i !== p) { [a[i], a[p]] = [a[p], a[i]]; det = -det; }
+            det *= a[i][i];
+            for (let j = i+1; j < sqSize; j++) { const f = a[j][i]/a[i][i]; for (let k = i+1; k < sqSize; k++) a[j][k] -= f*a[i][k]; }
+        }
+        showResult(`det(A) = ${formatNum(det)}`, 'Определитель');
+    }
+    function calcRank() {
+        const a = sqMatrices[sqTab].map(r => [...r]); let rank = sqSize;
+        for (let r = 0; r < rank; r++) {
+            if (Math.abs(a[r][r]) > 1e-12) {
+                for (let c = 0; c < sqSize; c++) if (c !== r) { const m = a[c][r]/a[r][r]; for (let i = 0; i < rank; i++) a[c][i] -= m*a[r][i]; }
+            } else {
+                let red = true; for (let i = r+1; i < sqSize; i++) if (Math.abs(a[i][r]) > 1e-12) { [a[r], a[i]] = [a[i], a[r]]; red = false; break; }
+                if (red) { rank--; for (let i = 0; i < sqSize; i++) a[i][r] = a[i][rank]; }
+                r--;
+            }
+        }
+        showResult(`rank(A) = ${rank}`, 'Ранг матрицы');
+    }
+    function calcInverse() {
+        const n = sqSize;
+        const aug = sqMatrices[sqTab].map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => (i === j ? 1 : 0))]);
+        for (let i = 0; i < n; i++) {
+            let mx = i; for (let k = i+1; k < n; k++) if (Math.abs(aug[k][i]) > Math.abs(aug[mx][i])) mx = k;
+            [aug[i], aug[mx]] = [aug[mx], aug[i]];
+            if (Math.abs(aug[i][i]) < 1e-12) return alert('Определитель равен 0, обратной нет!');
+            const div = aug[i][i]; for (let j = 0; j < 2*n; j++) aug[i][j] /= div;
+            for (let k = 0; k < n; k++) if (k !== i) { const f = aug[k][i]; for (let j = 0; j < 2*n; j++) aug[k][j] -= f*aug[i][j]; }
+        }
+        const res = aug.map(row => row.slice(n));
+        showResult(formatRaw(res), 'A⁻¹', res);
+    }
+
+    function calcRcMul() { if (rcColsA !== rcRowsB) return alert('Ошибка размерностей!'); showResult(formatRaw(mulM(rcMatrixA, rcMatrixB)), 'A × B', mulM(rcMatrixA, rcMatrixB)); }
+    function calcRcAdd() { showResult(formatRaw(addM(rcMatrixA, rcMatrixB)), 'A + B', addM(rcMatrixA, rcMatrixB)); }
+    function calcRcSub() { showResult(formatRaw(subM(rcMatrixA, rcMatrixB)), 'A - B', subM(rcMatrixA, rcMatrixB)); }
+    function calcDotProduct() {
+        const a = rcMatrixA.flat(), b = rcMatrixB.flat();
+        let s = 0; for(let i=0; i<a.length; i++) s += a[i]*b[i];
+        showResult(`a · b = ${formatNum(s)}`, 'Скалярное произведение');
+    }
+    function calcCrossProduct() {
+        const a = rcMatrixA.flat(), b = rcMatrixB.flat();
+        if(a.length !== 3 || b.length !== 3) return alert('Только для 3D векторов!');
+        const res = [[a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]]];
+        showResult(formatRaw(res), 'a ⨯ b', res);
+    }
+
+    function formatRaw(mat) { return mat.map(row => row.map(v => formatNum(v)).join('\t')).join('\n'); }
+
+    // Вывод обычной матрицы или ЖНФ в виде ИДЕАЛЬНОЙ РОВНОЙ ТАБЛИЦЫ СО СКОБКАМИ
+    function formatTableHTML(mat) {
+        let html = '<div style="display:flex; justify-content:center; align-items:center; gap:6px; margin:6px 0;">';
+        // Левая скобка
+        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div>';
+        
+        // Таблица
+        html += '<table style="border-collapse:collapse; text-align:center;">';
+        for (let i = 0; i < mat.length; i++) {
+            html += '<tr>';
+            for (let j = 0; j < mat[i].length; j++) {
+                const val = mat[i][j];
+                const isComplex = val.toString().includes('i');
+                const width = isComplex ? '120px' : '65px';
+                const color = (val === '1' && i !== j) ? 'var(--accent-cyan)' : 'var(--text-white)';
+                const weight = (i === j) ? 'bold' : 'normal';
+                
+                html += `<td style="width:${width}; height:32px; padding:2px 4px; font-family:monospace; font-size:13px; color:${color}; font-weight:${weight};">${val}</td>`;
+            }
+            html += '</tr>';
+        }
+        html += '</table>';
+        
+        // Правая скобка
+        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div>';
+        html += '</div>';
+        return html;
+    }
+
+    function transferResult(target) {
+        if (!lastResultMatrix) return;
+        if (currentMode === 0) {
+            sqMatrices[target] = lastResultMatrix.map(r => [...r]);
+            switchSqTab(target);
+        }
+    }
+
+    function copyResult() {
+        navigator.clipboard.writeText(document.getElementById('result-text').innerText);
+        alert('Скопировано в буфер!');
+    }
+
+    function addHistory(title, text) {
+        history.unshift({ title, text, time: new Date().toLocaleTimeString() });
+        localStorage.setItem('matrix_history', JSON.stringify(history));
+        document.getElementById('hist-count').innerText = history.length;
+        renderHistory();
+    }
+    function renderHistory() {
+        document.getElementById('history-list').innerHTML = history.map(item => `
+            <div class="history-item">
+                <div style="display:flex; justify-content:space-between; color:var(--accent-cyan); font-weight:bold;">
+                    <span>${item.title}</span><span style="color:var(--text-dim);">${item.time}</span>
+                </div>
+                <div style="margin-top:6px; white-space:pre-wrap;">${item.text}</div>
+            </div>
+        `).join('');
+    }
+    function toggleHistory() {
+        const m = document.getElementById('history-modal');
+        m.style.display = m.style.display === 'block' ? 'none' : 'block';
+    }
+    function clearHistory() { history = []; localStorage.removeItem('matrix_history'); document.getElementById('hist-count').innerText = '0'; renderHistory(); }
+
+    renderSq();
+    renderHistory();
+    document.getElementById('hist-count').innerText = history.length;
+</script>
+</body>
+</html>
