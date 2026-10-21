@@ -453,40 +453,84 @@
         renderSq();
     }
     function clearSq() { sqMatrices[sqTab] = createEmpty(sqSize, sqSize); renderSq(); }
+    
+    function applyPastedTextToMatrix(text, targetMatrix, maxRows, maxCols) {
+        if (!text || !text.trim()) return false;
+        
+        // Заменяем любые запятые, тире, минусы и убираем скобки
+        const normalized = text
+            .replace(/,/g, '.')
+            .replace(/−|–|—/g, '-')
+            .replace(/\[|\]/g, ' ')
+            .trim();
 
-    async function pasteSq() {
-        const text = await navigator.clipboard.readText();
-        const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
-        if (!nums) return alert('Числа не найдены!');
+        const numbers = normalized.match(/-?\d+(\.\d+)?/g);
+        if (!numbers || numbers.length === 0) return false;
+
         let idx = 0;
-        for (let i = 0; i < sqSize; i++) {
-            for (let j = 0; j < sqSize; j++) if (idx < nums.length) sqMatrices[sqTab][i][j] = parseFloat(nums[idx++]) || 0;
-        }
-        renderSq();
-    }
-
-    function renderRc() {
-        const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
-        const data = rcTab === 0 ? rcMatrixA : rcMatrixB;
-        const grid = document.getElementById('rc-matrix-grid');
-        grid.style.gridTemplateColumns = `repeat(${c}, 1fr)`;
-        grid.innerHTML = '';
-        for (let i = 0; i < r; i++) {
-            for (let j = 0; j < c; j++) {
-                const input = document.createElement('input');
-                input.type = 'number'; input.className = 'matrix-cell';
-                input.value = data[i][j];
-                input.onfocus = () => { if (input.value === '0') input.value = ''; };
-                input.onblur = () => { if (input.value === '') input.value = '0'; };
-                input.oninput = (e) => {
-                    if (rcTab === 0) rcMatrixA[i][j] = parseFloat(e.target.value) || 0;
-                    else rcMatrixB[i][j] = parseFloat(e.target.value) || 0;
-                };
-                grid.appendChild(input);
+        for (let i = 0; i < maxRows; i++) {
+            for (let j = 0; j < maxCols; j++) {
+                if (idx < numbers.length) {
+                    targetMatrix[i][j] = parseFloat(numbers[idx++]) || 0;
+                } else {
+                    targetMatrix[i][j] = 0;
+                }
             }
         }
-        document.getElementById('rc-rows-label').innerText = r;
-        document.getElementById('rc-cols-label').innerText = c;
+        return true;
+    }
+    async function pasteSq() {
+        let text = "";
+        try {
+            // Способ 1: Прямое чтение из буфера обмена
+            if (navigator.clipboard && navigator.clipboard.readText) {
+                text = await navigator.clipboard.readText();
+            }
+        } catch (err) {
+            console.log("Буфер заблокирован браузером, включаем запасной режим");
+        }
+
+        // Способ 2: Запасной вариант если браузер заблокировал буфер (для iOS / Safari / Chrome)
+        if (!text || text.trim() === "") {
+            text = prompt("Вставьте матрицу или числа сюда (Ctrl+V или зажмите палец):");
+        }
+
+        if (text) {
+            const success = applyPastedTextToMatrix(text, sqMatrices[sqTab], sqSize, sqSize);
+            if (success) {
+                renderSq();
+            } else {
+                alert("Не удалось распознать числа для вставки!");
+            }
+        }
+    }
+
+    async function pasteRc() {
+        let text = "";
+        try {
+            if (navigator.clipboard && navigator.clipboard.readText) {
+                text = await navigator.clipboard.readText();
+            }
+        } catch (err) {
+            console.log("Буфер заблокирован");
+        }
+
+        if (!text || text.trim() === "") {
+            text = prompt("Вставьте матрицу сюда (Ctrl+V или зажмите палец):");
+        }
+
+        if (text) {
+            const r = rcTab === 0 ? rcRowsA : rcRowsB;
+            const c = rcTab === 0 ? rcColsA : rcColsB;
+            const targetMat = rcTab === 0 ? rcMatrixA : rcMatrixB;
+
+            const success = applyPastedTextToMatrix(text, targetMat, r, c);
+            if (success) {
+                renderRc();
+            } else {
+                alert("Не удалось распознать числа для вставки!");
+            }
+        }
     }
 
     function switchRcTab(tab) {
