@@ -374,8 +374,8 @@
         }
         abs() { return Math.hypot(this.re, this.im); }
         toString() {
-            const r = Math.abs(this.re) < 1e-4 ? 0 : this.re;
-            const i = Math.abs(this.im) < 1e-4 ? 0 : this.im;
+            const r = Math.abs(this.re) < 1e-6 ? 0 : this.re;
+            const i = Math.abs(this.im) < 1e-6 ? 0 : this.im;
             if (i === 0) return formatNum(r);
             if (r === 0) return `${formatNum(i)}i`;
             return i > 0 ? `${formatNum(r)} + ${formatNum(i)}i` : `${formatNum(r)} - ${formatNum(Math.abs(i))}i`;
@@ -428,9 +428,7 @@
 
     function switchSqTab(tab) {
         sqTab = tab;
-        for (let i = 0; i < 3; i++) {
-            document.getElementById(`tab-sq-${i}`).className = 'tab' + (i === tab ? (i === 0 ? ' active-a' : (i === 1 ? ' active-b' : ' active-c')) : '');
-        }
+        for (let i = 0; i < 3; i++) document.getElementById(`tab-sq-${i}`).className = 'tab' + (i === tab ? (i === 0 ? ' active-a' : (i === 1 ? ' active-b' : ' active-c')) : '');
         renderSq();
     }
 
@@ -453,84 +451,48 @@
         renderSq();
     }
     function clearSq() { sqMatrices[sqTab] = createEmpty(sqSize, sqSize); renderSq(); }
-    
-    function applyPastedTextToMatrix(text, targetMatrix, maxRows, maxCols) {
-        if (!text || !text.trim()) return false;
-        
-        // Заменяем любые запятые, тире, минусы и убираем скобки
-        const normalized = text
-            .replace(/,/g, '.')
-            .replace(/−|–|—/g, '-')
-            .replace(/\[|\]/g, ' ')
-            .trim();
 
-        const numbers = normalized.match(/-?\d+(\.\d+)?/g);
-        if (!numbers || numbers.length === 0) return false;
-
-        let idx = 0;
-        for (let i = 0; i < maxRows; i++) {
-            for (let j = 0; j < maxCols; j++) {
-                if (idx < numbers.length) {
-                    targetMatrix[i][j] = parseFloat(numbers[idx++]) || 0;
-                } else {
-                    targetMatrix[i][j] = 0;
-                }
-            }
-        }
-        return true;
-    }
     async function pasteSq() {
-        let text = "";
         try {
-            // Способ 1: Прямое чтение из буфера обмена
-            if (navigator.clipboard && navigator.clipboard.readText) {
-                text = await navigator.clipboard.readText();
+            const text = await navigator.clipboard.readText();
+            const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
+            if (!nums) return alert('Числа не найдены!');
+            let idx = 0;
+            for (let i = 0; i < sqSize; i++) {
+                for (let j = 0; j < sqSize; j++) if (idx < nums.length) sqMatrices[sqTab][i][j] = parseFloat(nums[idx++]) || 0;
             }
-        } catch (err) {
-            console.log("Буфер заблокирован браузером, включаем запасной режим");
-        }
-
-        // Способ 2: Запасной вариант если браузер заблокировал буфер (для iOS / Safari / Chrome)
-        if (!text || text.trim() === "") {
-            text = prompt("Вставьте матрицу или числа сюда (Ctrl+V или зажмите палец):");
-        }
-
-        if (text) {
-            const success = applyPastedTextToMatrix(text, sqMatrices[sqTab], sqSize, sqSize);
-            if (success) {
-                renderSq();
-            } else {
-                alert("Не удалось распознать числа для вставки!");
-            }
-        }
+            renderSq();
+        } catch(e) { alert("Вставка заблокирована браузером"); }
     }
 
-    async function pasteRc() {
-        let text = "";
-        try {
-            if (navigator.clipboard && navigator.clipboard.readText) {
-                text = await navigator.clipboard.readText();
-            }
-        } catch (err) {
-            console.log("Буфер заблокирован");
-        }
-
-        if (!text || text.trim() === "") {
-            text = prompt("Вставьте матрицу сюда (Ctrl+V или зажмите палец):");
-        }
-
-        if (text) {
-            const r = rcTab === 0 ? rcRowsA : rcRowsB;
-            const c = rcTab === 0 ? rcColsA : rcColsB;
-            const targetMat = rcTab === 0 ? rcMatrixA : rcMatrixB;
-
-            const success = applyPastedTextToMatrix(text, targetMat, r, c);
-            if (success) {
-                renderRc();
-            } else {
-                alert("Не удалось распознать числа для вставки!");
+    // -------------------------------------------------------------
+    // ПРЯМОУГОЛЬНЫЕ МАТРИЦЫ (С ИСПРАВЛЕННЫМИ РАЗМЕРАМИ)
+    // -------------------------------------------------------------
+    function renderRc() {
+        const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
+        const data = rcTab === 0 ? rcMatrixA : rcMatrixB;
+        const grid = document.getElementById('rc-matrix-grid');
+        grid.style.gridTemplateColumns = `repeat(${c}, 1fr)`;
+        grid.innerHTML = '';
+        for (let i = 0; i < r; i++) {
+            for (let j = 0; j < c; j++) {
+                const input = document.createElement('input');
+                input.type = 'number'; input.className = 'matrix-cell';
+                input.value = data[i][j];
+                input.onfocus = () => { if (input.value === '0') input.value = ''; };
+                input.onblur = () => { if (input.value === '') input.value = '0'; };
+                input.oninput = (e) => { 
+                    if (rcTab === 0) rcMatrixA[i][j] = parseFloat(e.target.value) || 0; 
+                    else rcMatrixB[i][j] = parseFloat(e.target.value) || 0; 
+                };
+                grid.appendChild(input);
             }
         }
+        document.getElementById('rc-rows-label').innerText = r;
+        document.getElementById('rc-cols-label').innerText = c;
+        const color = rcTab === 0 ? 'var(--accent-cyan)' : 'var(--accent-purple)';
+        document.getElementById('rc-bracket-l').style.background = color;
+        document.getElementById('rc-bracket-r').style.background = color;
     }
 
     function switchRcTab(tab) {
@@ -554,210 +516,96 @@
         for (let i = 0; i < Math.min(old.length, nr); i++) for (let j = 0; j < Math.min(old[0].length, nc); j++) next[i][j] = old[i][j] || 0;
         return next;
     }
-    function swapRectMatrices() { [rcMatrixA, rcMatrixB] = [rcMatrixB, rcMatrixA]; [rcRowsA, rcRowsB] = [rcRowsB, rcRowsA]; [rcColsA, rcColsB] = [rcColsB, rcColsA]; renderRc(); }
+    function swapRectMatrices() { 
+        let tmp = rcMatrixA; rcMatrixA = rcMatrixB; rcMatrixB = tmp;
+        let tr = rcRowsA; rcRowsA = rcRowsB; rcRowsB = tr;
+        let tc = rcColsA; rcColsA = rcColsB; rcColsB = tc;
+        renderRc(); 
+    }
     function fillRcRandom() {
         const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
         for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) { if (rcTab === 0) rcMatrixA[i][j] = Math.floor(Math.random()*19)-9; else rcMatrixB[i][j] = Math.floor(Math.random()*19)-9; }
         renderRc();
     }
     function clearRc() { if (rcTab === 0) rcMatrixA = createEmpty(rcRowsA, rcColsA); else rcMatrixB = createEmpty(rcRowsB, rcColsB); renderRc(); }
-
-    async function pasteRc() {
-        const text = await navigator.clipboard.readText();
-        const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
-        if (!nums) return alert('Числа не найдены!');
-        const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
-        let idx = 0;
-        for (let i = 0; i < r; i++) {
-            for (let j = 0; j < c; j++) {
-                if (idx < nums.length) {
-                    if (rcTab === 0) rcMatrixA[i][j] = parseFloat(nums[idx++]) || 0;
-                    else rcMatrixB[i][j] = parseFloat(nums[idx++]) || 0;
-                }
-            }
-        }
+    function setRcPreset(r, c) {
+        if (rcTab === 0) { rcRowsA = r; rcColsA = c; rcMatrixA = resize(rcMatrixA, r, c); }
+        else { rcRowsB = r; rcColsB = c; rcMatrixB = resize(rcMatrixB, r, c); }
         renderRc();
     }
 
-    // -------------------------------------------------------------
-    // ЧЕСТНЫЙ МАТЕМАТИЧЕСКИЙ ДВИЖОК СПЕКТРАЛЬНОГО АНАЛИЗА
-    // -------------------------------------------------------------
-    function getEigenvalues(mat) {
-        const n = mat.length;
-        if (n === 1) return [new Complex(mat[0][0])];
-
-        let a = mat.map(r => [...r]);
-
-        // Хессенберг
-        for (let k = 0; k < n - 2; k++) {
-            let maxIdx = k + 1;
-            for (let i = k + 2; i < n; i++) if (Math.abs(a[i][k]) > Math.abs(a[maxIdx][k])) maxIdx = i;
-            if (Math.abs(a[maxIdx][k]) > 1e-12) {
-                if (maxIdx !== k + 1) {
-                    [a[maxIdx], a[k + 1]] = [a[k + 1], a[maxIdx]];
-                    for (let c = 0; c < n; c++) { const t = a[c][maxIdx]; a[c][maxIdx] = a[c][k + 1]; a[c][k + 1] = t; }
-                }
-                for (let i = k + 2; i < n; i++) {
-                    const factor = a[i][k] / a[k + 1][k];
-                    for (let j = k; j < n; j++) a[i][j] -= factor * a[k + 1][j];
-                    for (let j = 0; j < n; j++) a[j][k + 1] += factor * a[j][i];
-                }
-            }
-        }
-
-        const res = [];
-        let curN = n, iter = 150 * n;
-        while (curN > 1 && iter > 0) {
-            iter--;
-            const l = curN - 1;
-            if (Math.abs(a[l][l - 1]) <= 1e-8 * (Math.abs(a[l - 1][l - 1]) + Math.abs(a[l][l]) + 1e-8)) {
-                res.push(new Complex(a[l][l]));
-                curN--;
-                continue;
-            }
-            if (curN === 2 || Math.abs(a[l - 1][l - 2]) <= 1e-8 * (Math.abs(a[l - 2][l - 2]) + Math.abs(a[l - 1][l - 1]) + 1e-8)) {
-                const tr = a[l - 1][l - 1] + a[l][l];
-                const det = a[l - 1][l - 1] * a[l][l] - a[l][l - 1] * a[l - 1][l];
-                const disc = tr * tr - 4 * det;
-                if (disc >= 0) {
-                    res.push(new Complex((tr + Math.sqrt(disc)) / 2));
-                    res.push(new Complex((tr - Math.sqrt(disc)) / 2));
-                } else {
-                    res.push(new Complex(tr / 2, Math.sqrt(-disc) / 2));
-                    res.push(new Complex(tr / 2, -Math.sqrt(-disc) / 2));
-                }
-                curN -= 2;
-                continue;
-            }
-
-            const shift = a[l][l];
-            for (let i = 0; i < curN; i++) a[i][i] -= shift;
-
-            const cList = new Array(curN - 1), sList = new Array(curN - 1);
-            for (let i = 0; i < curN - 1; i++) {
-                const r = Math.hypot(a[i][i], a[i + 1][i]);
-                if (r > 1e-14) {
-                    cList[i] = a[i][i] / r;
-                    sList[i] = -a[i + 1][i] / r;
-                    for (let j = i; j < curN; j++) {
-                        const t1 = a[i][j], t2 = a[i + 1][j];
-                        a[i][j] = cList[i] * t1 - sList[i] * t2;
-                        a[i + 1][j] = sList[i] * t1 + cList[i] * t2;
-                    }
-                } else { cList[i] = 1; sList[i] = 0; }
-            }
-            for (let i = 0; i < curN - 1; i++) {
-                for (let j = 0; j <= Math.min(i + 2, curN - 1); j++) {
-                    const t1 = a[j][i], t2 = a[j][i + 1];
-                    a[j][i] = cList[i] * t1 - sList[i] * t2;
-                    a[j][i + 1] = sList[i] * t1 + cList[i] * t2;
-                }
-            }
-            for (let i = 0; i < curN; i++) a[i][i] += shift;
-        }
-        if (curN === 1) res.push(new Complex(a[0][0]));
-        while (res.length < n) res.push(new Complex(a[res.length][res.length]));
-        return res.sort((x, y) => y.abs() - x.abs());
-    }
-
-    function getEigenvectors(mat, eigs) {
-        const n = mat.length;
-        const vecs = [];
-
-        for (let lambda of eigs) {
-            // Решаем (A - λI)v = 0 методом Гаусса для комплексных чисел
-            const m = Array(n).fill(0).map((_, i) =>
-                Array(n).fill(0).map((_, j) => (i === j ? new Complex(mat[i][j]).sub(lambda) : new Complex(mat[i][j])))
-            );
-
-            for (let i = 0; i < n - 1; i++) {
-                let maxR = i;
-                for (let k = i + 1; k < n; k++) if (m[k][i].abs() > m[maxR][i].abs()) maxR = k;
-                [m[i], m[maxR]] = [m[maxR], m[i]];
-
-                for (let k = i + 1; k < n; k++) {
-                    if (m[i][i].abs() > 1e-10) {
-                        const factor = m[k][i].div(m[i][i]);
-                        for (let j = i; j < n; j++) m[k][j] = m[k][j].sub(factor.mul(m[i][j]));
+    async function pasteRc() {
+        try {
+            const text = await navigator.clipboard.readText();
+            const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
+            if (!nums) return alert('Числа не найдены!');
+            const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
+            let idx = 0;
+            for (let i = 0; i < r; i++) {
+                for (let j = 0; j < c; j++) {
+                    if (idx < nums.length) {
+                        if (rcTab === 0) rcMatrixA[i][j] = parseFloat(nums[idx++]) || 0;
+                        else rcMatrixB[i][j] = parseFloat(nums[idx++]) || 0;
                     }
                 }
             }
-
-            const v = Array(n).fill(new Complex(0));
-            v[n - 1] = new Complex(1); // свободная переменная
-            for (let i = n - 2; i >= 0; i--) {
-                let sum = new Complex(0);
-                for (let j = i + 1; j < n; j++) sum = sum.add(m[i][j].mul(v[j]));
-                v[i] = m[i][i].abs() > 1e-9 ? new Complex(0).sub(sum).div(m[i][i]) : new Complex(1);
-            }
-
-            let normSq = 0;
-            v.forEach(x => normSq += x.re * x.re + x.im * x.im);
-            const norm = Math.sqrt(normSq) || 1;
-            vecs.push(v.map(x => x.div(new Complex(norm))));
-        }
-        return vecs;
+            renderRc();
+        } catch(e) { alert("Вставка заблокирована"); }
     }
 
     // -------------------------------------------------------------
-    // РЕАЛЬНЫЕ ОБРАБОТЧИКИ КНОПОК
+    // ГЛОБАЛЬНАЯ ТОЧНОСТЬ И МАТЕМАТИКА
     // -------------------------------------------------------------
-    function calcEigenvalues() {
-        const eigs = getEigenvalues(sqMatrices[sqTab]);
-        const text = eigs.map((c, idx) => `λ_${idx + 1} = ${c.toString()}`).join('\n');
-        showResult(`Собственные числа спектра:\n\n` + text, 'Собственные числа λ_i');
+    
+    // Формат для вывода на экран (3 знака)
+    function formatNum(v) { 
+        if (Math.abs(v) < 1e-12) return '0';
+        let rounded = Math.round(v * 1000) / 1000;
+        return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(3).replace(/\.?0+$/, '');
     }
 
-    function calcEigenvectors() {
-        const mat = sqMatrices[sqTab];
-        const eigs = getEigenvalues(mat);
-        const vecs = getEigenvectors(mat, eigs);
-        const text = vecs.map((v, idx) => `v_${idx + 1} (для λ_${idx + 1}):\n[ ` + v.map(c => c.toString()).join(', ') + ' ]ᵀ').join('\n\n');
-        showResult(`Собственные векторы:\n\n` + text, 'Собственные векторы v_i');
+    // Точный формат (до 8 знаков) для скрытого переноса (чтобы математика не ломалась!)
+    function formatPrecise(v) {
+        return Math.abs(v) < 1e-12 ? 0 : Number(v.toFixed(8));
     }
 
-    function calcJordan() {
-        const n = sqSize;
-        const eigs = getEigenvalues(sqMatrices[sqTab]);
-        const jnf = Array(n).fill(0).map(() => Array(n).fill('0'));
-
-        let hasBlock = false;
-        for (let i = 0; i < n; i++) {
-            jnf[i][i] = eigs[i].toString();
-            // Если есть кратные корни -> ставим единицу над диагональю
-            if (i > 0 && eigs[i].sub(eigs[i - 1]).abs() < 1e-2) {
-                jnf[i - 1][i] = '1';
-                hasBlock = true;
-            }
-        }
-
-        const desc = hasBlock ? "Жорданова нормальная форма (ЖНФ, есть кратные корни):" : "Диагональный вид (Все собственные числа различны):";
-        
-        // Выводим через идеальную HTML-таблицу!
-        lastResultMatrix = null;
-        document.getElementById('result-text').innerHTML = `<div style="font-family:sans-serif; margin-bottom:8px;">${desc}</div>` + formatTableHTML(jnf);
-        document.getElementById('result-card').style.display = 'flex';
-        document.getElementById('transfer-block').style.display = 'none';
-        document.getElementById('transfer-title').style.display = 'none';
-        addHistory('Жорданова форма', desc);
-    }
-    // Вспомогательные функции
-    function formatNum(v) {
-        const nearInt = Math.round(v);
-        const val = Math.abs(v - nearInt) < 0.005 ? nearInt : v;
-        const clean = Math.abs(val) < 1e-9 ? 0 : val;
-        return clean % 1 === 0 ? clean.toString() : clean.toFixed(3);
-    }
-
-    function showResult(text, title, mat = null) {
+    function showResult(text, title, mat = null, isGrid = false) {
         lastResultMatrix = mat;
-        document.getElementById('result-text').innerHTML = text;
+        
+        if (isGrid && mat) {
+            document.getElementById('result-text').innerHTML = formatTableHTML(mat);
+        } else {
+            document.getElementById('result-text').innerText = text;
+        }
+
         document.getElementById('result-card').style.display = 'flex';
         document.getElementById('transfer-block').style.display = mat ? 'flex' : 'none';
         document.getElementById('transfer-title').style.display = mat ? 'block' : 'none';
-        addHistory(title, text);
+        addHistory(title, isGrid ? "Сетка результатов" : text);
     }
 
+    function formatTableHTML(mat) {
+        let html = '<div style="display:flex; justify-content:center; align-items:center; gap:6px; margin:6px 0;">';
+        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div>';
+        html += '<table style="border-collapse:collapse; text-align:center;">';
+        for (let i = 0; i < mat.length; i++) {
+            html += '<tr>';
+            for (let j = 0; j < mat[i].length; j++) {
+                const val = mat[i][j];
+                const isComplex = val.toString().includes('i');
+                const width = isComplex ? '120px' : '55px';
+                const color = (val === '1' && i !== j) ? 'var(--accent-cyan)' : 'var(--text-white)';
+                const weight = (i === j) ? 'bold' : 'normal';
+                html += `<td style="width:${width}; height:32px; padding:2px 4px; font-family:monospace; font-size:13px; color:${color}; font-weight:${weight};">${val}</td>`;
+            }
+            html += '</tr>';
+        }
+        html += '</table>';
+        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div></div>';
+        return html;
+    }
+
+    // Операции
     function addM(a, b) { return a.map((row, i) => row.map((v, j) => v + b[i][j])); }
     function subM(a, b) { return a.map((row, i) => row.map((v, j) => v - b[i][j])); }
     function mulM(a, b) {
@@ -767,9 +615,10 @@
         return res;
     }
 
-    function calcSqAdd() { showResult(formatRaw(addM(sqMatrices[0], sqMatrices[1])), 'A + B', addM(sqMatrices[0], sqMatrices[1])); }
-    function calcSqSub() { showResult(formatRaw(subM(sqMatrices[0], sqMatrices[1])), 'A - B', subM(sqMatrices[0], sqMatrices[1])); }
-    function calcSqMul() { showResult(formatRaw(mulM(sqMatrices[0], sqMatrices[1])), 'A × B', mulM(sqMatrices[0], sqMatrices[1])); }
+    // Квадратные кнопки
+    function calcSqAdd() { const r = addM(sqMatrices[0], sqMatrices[1]); showResult(formatRaw(r), 'A + B', r); }
+    function calcSqSub() { const r = subM(sqMatrices[0], sqMatrices[1]); showResult(formatRaw(r), 'A - B', r); }
+    function calcSqMul() { const r = mulM(sqMatrices[0], sqMatrices[1]); showResult(formatRaw(r), 'A × B', r); }
     function calcTripleAdd() { const r = addM(addM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A + B + C', r); }
     function calcTripleSub() { const r = subM(subM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A - B - C', r); }
     function calcTripleMul() { const r = mulM(mulM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A × B × C', r); }
@@ -815,11 +664,26 @@
         showResult(formatRaw(res), 'A⁻¹', res);
     }
 
-    function calcRcMul() { if (rcColsA !== rcRowsB) return alert('Ошибка размерностей!'); showResult(formatRaw(mulM(rcMatrixA, rcMatrixB)), 'A × B', mulM(rcMatrixA, rcMatrixB)); }
-    function calcRcAdd() { showResult(formatRaw(addM(rcMatrixA, rcMatrixB)), 'A + B', addM(rcMatrixA, rcMatrixB)); }
-    function calcRcSub() { showResult(formatRaw(subM(rcMatrixA, rcMatrixB)), 'A - B', subM(rcMatrixA, rcMatrixB)); }
+    // Прямоугольные кнопки (ИСПРАВЛЕНО УМНОЖЕНИЕ)
+    function calcRcMul() { 
+        if (rcColsA !== rcRowsB) {
+            alert(`Ошибка! Столбцов A (${rcColsA}) должно быть равно строкам B (${rcRowsB})`);
+            return;
+        }
+        const res = mulM(rcMatrixA, rcMatrixB);
+        showResult(formatRaw(res), 'A × B', res); 
+    }
+    function calcRcAdd() { 
+        if (rcRowsA !== rcRowsB || rcColsA !== rcColsB) return alert('Размеры матриц должны совпадать!');
+        const res = addM(rcMatrixA, rcMatrixB); showResult(formatRaw(res), 'A + B', res); 
+    }
+    function calcRcSub() { 
+        if (rcRowsA !== rcRowsB || rcColsA !== rcColsB) return alert('Размеры матриц должны совпадать!');
+        const res = subM(rcMatrixA, rcMatrixB); showResult(formatRaw(res), 'A - B', res); 
+    }
     function calcDotProduct() {
         const a = rcMatrixA.flat(), b = rcMatrixB.flat();
+        if (a.length !== b.length) return alert('Длины векторов не совпадают!');
         let s = 0; for(let i=0; i<a.length; i++) s += a[i]*b[i];
         showResult(`a · b = ${formatNum(s)}`, 'Скалярное произведение');
     }
@@ -832,41 +696,29 @@
 
     function formatRaw(mat) { return mat.map(row => row.map(v => formatNum(v)).join('\t')).join('\n'); }
 
-    // Вывод обычной матрицы или ЖНФ в виде ИДЕАЛЬНОЙ РОВНОЙ ТАБЛИЦЫ СО СКОБКАМИ
-    function formatTableHTML(mat) {
-        let html = '<div style="display:flex; justify-content:center; align-items:center; gap:6px; margin:6px 0;">';
-        // Левая скобка
-        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div>';
-        
-        // Таблица
-        html += '<table style="border-collapse:collapse; text-align:center;">';
-        for (let i = 0; i < mat.length; i++) {
-            html += '<tr>';
-            for (let j = 0; j < mat[i].length; j++) {
-                const val = mat[i][j];
-                const isComplex = val.toString().includes('i');
-                const width = isComplex ? '120px' : '65px';
-                const color = (val === '1' && i !== j) ? 'var(--accent-cyan)' : 'var(--text-white)';
-                const weight = (i === j) ? 'bold' : 'normal';
-                
-                html += `<td style="width:${width}; height:32px; padding:2px 4px; font-family:monospace; font-size:13px; color:${color}; font-weight:${weight};">${val}</td>`;
-            }
-            html += '</tr>';
-        }
-        html += '</table>';
-        
-        // Правая скобка
-        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div>';
-        html += '</div>';
-        return html;
-    }
-
+    // --- ПЕРЕНОС В РЕГИСТРЫ С ВЫСОКОЙ ТОЧНОСТЬЮ ---
     function transferResult(target) {
         if (!lastResultMatrix) return;
         if (currentMode === 0) {
-            sqMatrices[target] = lastResultMatrix.map(r => [...r]);
+            // Перенос в Квадратные
+            sqSize = lastResultMatrix.length;
+            sqMatrices[target] = lastResultMatrix.map(r => r.map(v => formatPrecise(v)));
             switchSqTab(target);
+        } else {
+            // Перенос в Прямоугольные
+            if (target === 0) {
+                rcRowsA = lastResultMatrix.length;
+                rcColsA = lastResultMatrix[0].length;
+                rcMatrixA = lastResultMatrix.map(r => r.map(v => formatPrecise(v)));
+                switchRcTab(0);
+            } else if (target === 1) {
+                rcRowsB = lastResultMatrix.length;
+                rcColsB = lastResultMatrix[0].length;
+                rcMatrixB = lastResultMatrix.map(r => r.map(v => formatPrecise(v)));
+                switchRcTab(1);
+            }
         }
+        alert(`Успешно перенесено в матрицу ${target === 0 ? 'A' : (target === 1 ? 'B' : 'C')}!`);
     }
 
     function copyResult() {
@@ -874,6 +726,7 @@
         alert('Скопировано в буфер!');
     }
 
+    // История
     function addHistory(title, text) {
         history.unshift({ title, text, time: new Date().toLocaleTimeString() });
         localStorage.setItem('matrix_history', JSON.stringify(history));
