@@ -553,14 +553,27 @@
     // -------------------------------------------------------------
     function formatNum(v) { 
         if (Math.abs(v) < 1e-12) return '0';
-        let nearInt = Math.round(v);
-        let val = Math.abs(v - nearInt) < 0.01 ? nearInt : v;
-        return val % 1 === 0 ? val.toString() : val.toFixed(3).replace(/\.?0+$/, '');
+        
+        // Магнитное притягивание к целым (если разница меньше 0.02)
+        const nearInt = Math.round(v);
+        if (Math.abs(v - nearInt) < 0.02) {
+            return nearInt.toString();
+        }
+        
+        // Обычные честные дроби
+        return v % 1 === 0 ? v.toString() : v.toFixed(3).replace(/\.?0+$/, '');
     }
-    function formatPrecise(v) {
-        return Math.abs(v) < 1e-12 ? 0 : Number(v.toFixed(8));
+    function formatPrecise(v) { 
+        if (Math.abs(v) < 1e-12) return 0;
+        
+        const nearInt = Math.round(v);
+        // Расширенный порог 0.02 схлопывает 1.999 в честную двойку 2
+        if (Math.abs(v - nearInt) < 0.02) {
+            return nearInt;
+        }
+        return parseFloat(v.toFixed(5));
     }
-
+    
 
     // Главная функция вывода результатов
     function showResult(contentHtml, title, mat = null) {
