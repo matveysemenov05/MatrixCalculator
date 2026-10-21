@@ -452,22 +452,28 @@
     }
     function clearSq() { sqMatrices[sqTab] = createEmpty(sqSize, sqSize); renderSq(); }
 
-    async function pasteSq() {
-        try {
-            const text = await navigator.clipboard.readText();
-            const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
-            if (!nums) return alert('Числа не найдены!');
-            let idx = 0;
-            for (let i = 0; i < sqSize; i++) {
-                for (let j = 0; j < sqSize; j++) if (idx < nums.length) sqMatrices[sqTab][i][j] = parseFloat(nums[idx++]) || 0;
+    function applyPastedTextToMatrix(text, targetMatrix, maxRows, maxCols) {
+        if (!text || !text.trim()) return false;
+        const normalized = text.replace(/,/g, '.').replace(/−|–|—/g, '-').replace(/\[|\]/g, ' ').trim();
+        const numbers = normalized.match(/-?\d+(\.\d+)?/g);
+        if (!numbers || numbers.length === 0) return false;
+        let idx = 0;
+        for (let i = 0; i < maxRows; i++) {
+            for (let j = 0; j < maxCols; j++) {
+                if (idx < numbers.length) targetMatrix[i][j] = parseFloat(numbers[idx++]) || 0;
+                else targetMatrix[i][j] = 0;
             }
-            renderSq();
-        } catch(e) { alert("Вставка заблокирована браузером"); }
+        }
+        return true;
     }
 
-    // -------------------------------------------------------------
-    // ПРЯМОУГОЛЬНЫЕ МАТРИЦЫ (С ИСПРАВЛЕННЫМИ РАЗМЕРАМИ)
-    // -------------------------------------------------------------
+    async function pasteSq() {
+        let text = "";
+        try { if (navigator.clipboard && navigator.clipboard.readText) text = await navigator.clipboard.readText(); } catch (err) {}
+        if (!text || text.trim() === "") text = prompt("Вставьте матрицу сюда (Ctrl+V):");
+        if (text && applyPastedTextToMatrix(text, sqMatrices[sqTab], sqSize, sqSize)) renderSq();
+    }
+
     function renderRc() {
         const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
         const data = rcTab === 0 ? rcMatrixA : rcMatrixB;
@@ -528,56 +534,28 @@
         renderRc();
     }
     function clearRc() { if (rcTab === 0) rcMatrixA = createEmpty(rcRowsA, rcColsA); else rcMatrixB = createEmpty(rcRowsB, rcColsB); renderRc(); }
-    function setRcPreset(r, c) {
-        if (rcTab === 0) { rcRowsA = r; rcColsA = c; rcMatrixA = resize(rcMatrixA, r, c); }
-        else { rcRowsB = r; rcColsB = c; rcMatrixB = resize(rcMatrixB, r, c); }
-        renderRc();
-    }
 
     async function pasteRc() {
-        try {
-            const text = await navigator.clipboard.readText();
-            const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
-            if (!nums) return alert('Числа не найдены!');
+        let text = "";
+        try { if (navigator.clipboard && navigator.clipboard.readText) text = await navigator.clipboard.readText(); } catch (err) {}
+        if (!text || text.trim() === "") text = prompt("Вставьте матрицу сюда (Ctrl+V):");
+        if (text) {
             const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
-            let idx = 0;
-            for (let i = 0; i < r; i++) {
-                for (let j = 0; j < c; j++) {
-                    if (idx < nums.length) {
-                        if (rcTab === 0) rcMatrixA[i][j] = parseFloat(nums[idx++]) || 0;
-                        else rcMatrixB[i][j] = parseFloat(nums[idx++]) || 0;
-                    }
-                }
-            }
-            renderRc();
-        } catch(e) { alert("Вставка заблокирована"); }
+            if (applyPastedTextToMatrix(text, rcTab === 0 ? rcMatrixA : rcMatrixB, r, c)) renderRc();
+        }
     }
 
-    // -------------------------------------------------------------
-    // ГЛОБАЛЬНАЯ ТОЧНОСТЬ И МАТЕМАТИКА
-    // -------------------------------------------------------------
-    
-    // Формат для вывода на экран (3 знака)
     function formatNum(v) { 
         if (Math.abs(v) < 1e-12) return '0';
         let rounded = Math.round(v * 1000) / 1000;
         return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(3).replace(/\.?0+$/, '');
     }
-
-    // Точный формат (до 8 знаков) для скрытого переноса (чтобы математика не ломалась!)
-    function formatPrecise(v) {
-        return Math.abs(v) < 1e-12 ? 0 : Number(v.toFixed(8));
-    }
+    function formatPrecise(v) { return Math.abs(v) < 1e-12 ? 0 : Number(v.toFixed(8)); }
 
     function showResult(text, title, mat = null, isGrid = false) {
         lastResultMatrix = mat;
-        
-        if (isGrid && mat) {
-            document.getElementById('result-text').innerHTML = formatTableHTML(mat);
-        } else {
-            document.getElementById('result-text').innerText = text;
-        }
-
+        if (isGrid && mat) document.getElementById('result-text').innerHTML = formatTableHTML(mat);
+        else document.getElementById('result-text').innerText = text;
         document.getElementById('result-card').style.display = 'flex';
         document.getElementById('transfer-block').style.display = mat ? 'flex' : 'none';
         document.getElementById('transfer-title').style.display = mat ? 'block' : 'none';
@@ -600,28 +578,68 @@
             }
             html += '</tr>';
         }
-        html += '</table>';
-        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div></div>';
+        html += '</table><div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div></div>';
         return html;
     }
 
-    // Операции
-    function addM(a, b) { return a.map((row, i) => row.map((v, j) => v + b[i][j])); }
-    function subM(a, b) { return a.map((row, i) => row.map((v, j) => v - b[i][j])); }
+    // БАЗОВЫЕ МАТРИЧНЫЕ ОПЕРАЦИИ С ЗАЩИТОЙ
+    function addM(a, b) {
+        if (!a || !b || a.length !== b.length || a[0].length !== b[0].length) return null;
+        return a.map((row, i) => row.map((v, j) => v + b[i][j]));
+    }
+    function subM(a, b) {
+        if (!a || !b || a.length !== b.length || a[0].length !== b[0].length) return null;
+        return a.map((row, i) => row.map((v, j) => v - b[i][j]));
+    }
     function mulM(a, b) {
+        if (!a || !b || a[0].length !== b.length) return null;
         const r1 = a.length, c1 = a[0].length, c2 = b[0].length;
         const res = createEmpty(r1, c2);
         for (let i = 0; i < r1; i++) for (let j = 0; j < c2; j++) { let s = 0; for (let k = 0; k < c1; k++) s += a[i][k]*b[k][j]; res[i][j] = s; }
         return res;
     }
 
-    // Квадратные кнопки
-    function calcSqAdd() { const r = addM(sqMatrices[0], sqMatrices[1]); showResult(formatRaw(r), 'A + B', r); }
-    function calcSqSub() { const r = subM(sqMatrices[0], sqMatrices[1]); showResult(formatRaw(r), 'A - B', r); }
-    function calcSqMul() { const r = mulM(sqMatrices[0], sqMatrices[1]); showResult(formatRaw(r), 'A × B', r); }
-    function calcTripleAdd() { const r = addM(addM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A + B + C', r); }
-    function calcTripleSub() { const r = subM(subM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A - B - C', r); }
-    function calcTripleMul() { const r = mulM(mulM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult(formatRaw(r), 'A × B × C', r); }
+    // ДВОЙНЫЕ ОПЕРАЦИИ (РАБОТАЮТ ВСЕ ВАРИАНТЫ ВЫЗОВА)
+    function calcSqAdd() { calcAdd(); }
+    function calcAdd() {
+        const res = addM(sqMatrices[0], sqMatrices[1]);
+        if (!res) return alert("Ошибка: размеры матриц A и B не совпадают!");
+        showResult(formatRaw(res), "A + B", res);
+    }
+
+    function calcSqSub() { calcSub(); }
+    function calcSub() {
+        const res = subM(sqMatrices[0], sqMatrices[1]);
+        if (!res) return alert("Ошибка: размеры матриц A и B не совпадают!");
+        showResult(formatRaw(res), "A - B", res);
+    }
+
+    function calcSqMul() { calcMul(); }
+    function calcMul() {
+        const res = mulM(sqMatrices[0], sqMatrices[1]);
+        if (!res) return alert("Ошибка умножения: проверьте размеры матриц!");
+        showResult(formatRaw(res), "A × B", res);
+    }
+
+    // ТРОЙНЫЕ ОПЕРАЦИИ
+    function calcTripleAdd() {
+        const ab = addM(sqMatrices[0], sqMatrices[1]);
+        const res = ab ? addM(ab, sqMatrices[2]) : null;
+        if (!res) return alert("Ошибка сложения трех матриц!");
+        showResult(formatRaw(res), "A + B + C", res);
+    }
+    function calcTripleSub() {
+        const ab = subM(sqMatrices[0], sqMatrices[1]);
+        const res = ab ? subM(ab, sqMatrices[2]) : null;
+        if (!res) return alert("Ошибка вычитания трех матриц!");
+        showResult(formatRaw(res), "A - B - C", res);
+    }
+    function calcTripleMul() {
+        const ab = mulM(sqMatrices[0], sqMatrices[1]);
+        const res = ab ? mulM(ab, sqMatrices[2]) : null;
+        if (!res) return alert("Ошибка умножения трех матриц!");
+        showResult(formatRaw(res), "A × B × C", res);
+    }
 
     function calcTranspose() { const m = sqMatrices[sqTab]; const r = m.map((_, i) => m.map(row => row[i])); showResult(formatRaw(r), 'Aᵀ', r); }
     function calcNorm() { let s = 0; sqMatrices[sqTab].forEach(r => r.forEach(v => s += v*v)); showResult(`‖A‖_F = ${Math.sqrt(s).toFixed(3)}`, 'Норма Фробениуса'); }
@@ -664,12 +682,9 @@
         showResult(formatRaw(res), 'A⁻¹', res);
     }
 
-    // Прямоугольные кнопки (ИСПРАВЛЕНО УМНОЖЕНИЕ)
+    // Прямоугольные операции
     function calcRcMul() { 
-        if (rcColsA !== rcRowsB) {
-            alert(`Ошибка! Столбцов A (${rcColsA}) должно быть равно строкам B (${rcRowsB})`);
-            return;
-        }
+        if (rcColsA !== rcRowsB) return alert(`Ошибка! Столбцов A (${rcColsA}) должно быть равно строкам B (${rcRowsB})`);
         const res = mulM(rcMatrixA, rcMatrixB);
         showResult(formatRaw(res), 'A × B', res); 
     }
@@ -678,80 +693,6 @@
         const res = addM(rcMatrixA, rcMatrixB); showResult(formatRaw(res), 'A + B', res); 
     }
     function calcRcSub() { 
-        if (rcRowsA !== rcRowsB || rcColsA !== rcColsB) return alert('Размеры матриц должны совпадать!');
-        const res = subM(rcMatrixA, rcMatrixB); showResult(formatRaw(res), 'A - B', res); 
-    }
-    function calcDotProduct() {
-        const a = rcMatrixA.flat(), b = rcMatrixB.flat();
-        if (a.length !== b.length) return alert('Длины векторов не совпадают!');
-        let s = 0; for(let i=0; i<a.length; i++) s += a[i]*b[i];
-        showResult(`a · b = ${formatNum(s)}`, 'Скалярное произведение');
-    }
-    function calcCrossProduct() {
-        const a = rcMatrixA.flat(), b = rcMatrixB.flat();
-        if(a.length !== 3 || b.length !== 3) return alert('Только для 3D векторов!');
-        const res = [[a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]]];
-        showResult(formatRaw(res), 'a ⨯ b', res);
-    }
-
-    function formatRaw(mat) { return mat.map(row => row.map(v => formatNum(v)).join('\t')).join('\n'); }
-
-    // --- ПЕРЕНОС В РЕГИСТРЫ С ВЫСОКОЙ ТОЧНОСТЬЮ ---
-    function transferResult(target) {
-        if (!lastResultMatrix) return;
-        if (currentMode === 0) {
-            // Перенос в Квадратные
-            sqSize = lastResultMatrix.length;
-            sqMatrices[target] = lastResultMatrix.map(r => r.map(v => formatPrecise(v)));
-            switchSqTab(target);
-        } else {
-            // Перенос в Прямоугольные
-            if (target === 0) {
-                rcRowsA = lastResultMatrix.length;
-                rcColsA = lastResultMatrix[0].length;
-                rcMatrixA = lastResultMatrix.map(r => r.map(v => formatPrecise(v)));
-                switchRcTab(0);
-            } else if (target === 1) {
-                rcRowsB = lastResultMatrix.length;
-                rcColsB = lastResultMatrix[0].length;
-                rcMatrixB = lastResultMatrix.map(r => r.map(v => formatPrecise(v)));
-                switchRcTab(1);
-            }
-        }
-        alert(`Успешно перенесено в матрицу ${target === 0 ? 'A' : (target === 1 ? 'B' : 'C')}!`);
-    }
-
-    function copyResult() {
-        navigator.clipboard.writeText(document.getElementById('result-text').innerText);
-        alert('Скопировано в буфер!');
-    }
-
-    // История
-    function addHistory(title, text) {
-        history.unshift({ title, text, time: new Date().toLocaleTimeString() });
-        localStorage.setItem('matrix_history', JSON.stringify(history));
-        document.getElementById('hist-count').innerText = history.length;
-        renderHistory();
-    }
-    function renderHistory() {
-        document.getElementById('history-list').innerHTML = history.map(item => `
-            <div class="history-item">
-                <div style="display:flex; justify-content:space-between; color:var(--accent-cyan); font-weight:bold;">
-                    <span>${item.title}</span><span style="color:var(--text-dim);">${item.time}</span>
-                </div>
-                <div style="margin-top:6px; white-space:pre-wrap;">${item.text}</div>
-            </div>
-        `).join('');
-    }
-    function toggleHistory() {
-        const m = document.getElementById('history-modal');
-        m.style.display = m.style.display === 'block' ? 'none' : 'block';
-    }
-    function clearHistory() { history = []; localStorage.removeItem('matrix_history'); document.getElementById('hist-count').innerText = '0'; renderHistory(); }
-
-    renderSq();
-    renderHistory();
-    document.getElementById('hist-count').innerText = history.length;
-</script>
+        if (rcRowsA !== rcRowsB || rcColsA !== rcColsB) return
 </body>
 </html>
