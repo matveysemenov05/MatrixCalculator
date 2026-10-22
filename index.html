@@ -178,13 +178,12 @@
         .btn-op:active { transform: scale(0.96); }
         .btn-op.highlight { border-color: rgba(6, 182, 212, 0.5); background: #1E293B; }
 
-        /* КАРТОЧКА РЕЗУЛЬТАТА (ЖЕЛЕЗОБЕТОННОЕ ОТОБРАЖЕНИЕ) */
         .result-card {
             background: var(--card-dark); border: 1px solid var(--accent-emerald);
             border-radius: 16px; padding: 16px; margin-top: 10px; display: none; flex-direction: column; gap: 10px;
         }
         .result-header { display: flex; justify-content: space-between; font-size: 12px; font-weight: bold; color: var(--accent-emerald); }
-        .result-content { font-family: monospace; font-size: 14px; line-height: 1.6; text-align: center; overflow-x: auto; }
+        .result-content { font-family: monospace; font-size: 14px; white-space: pre-wrap; line-height: 1.6; text-align: center; overflow-x: auto; }
         .result-transfer { display: flex; gap: 6px; border-top: 1px solid var(--border-color); padding-top: 10px; }
         .btn-transfer { flex: 1; padding: 8px; border-radius: 8px; font-size: 11.5px; font-weight: bold; background: transparent; cursor: pointer; }
         .btn-transfer.a { border: 1px solid var(--accent-cyan); color: var(--accent-cyan); background: rgba(6, 182, 212, 0.1); }
@@ -246,10 +245,19 @@
         </div>
 
         <div class="section-title">Спектральный анализ (ТАУ):</div>
-        <div class="btn-row" style="grid-template-columns: repeat(3, 1fr);">
-            <button class="btn-op highlight" onclick="calcEigenvalues()">λ_i (Числа)</button>
+        <div class="btn-row two-col">
+            <button class="btn-op highlight" onclick="calcEigenvalues()">λ_i (Собств. числа)</button>
             <button class="btn-op highlight" onclick="calcEigenvectors()">v_i (Векторы)</button>
-            <button class="btn-op highlight" onclick="calcJordan()">ЖНФ</button>
+        </div>
+        <div class="btn-row two-col" style="margin-top: 6px;">
+            <button class="btn-op highlight" onclick="calcJordan()">ЖНФ (Комплексная)</button>
+            <button class="btn-op highlight" onclick="calcRealJordan()">РЖНФ (Вещественная)</button>
+        </div>
+
+        <div class="section-title">Матричные функции:</div>
+        <div class="btn-row two-col">
+            <button class="btn-op highlight" onclick="calcMatrixExp()">e^A (Экспонента)</button>
+            <button class="btn-op highlight" onclick="calcSquare()">A² (Квадрат)</button>
         </div>
 
         <div class="section-title">Тройные операции (A, B, C):</div>
@@ -261,9 +269,9 @@
 
         <div class="section-title">Операции A и B:</div>
         <div class="btn-row">
-            <button class="btn-op" onclick="calcSqAdd()">A + B</button>
-            <button class="btn-op" onclick="calcSqSub()">A - B</button>
-            <button class="btn-op" onclick="calcSqMul()">A × B</button>
+            <button class="btn-op" onclick="calcAdd()">A + B</button>
+            <button class="btn-op" onclick="calcSub()">A - B</button>
+            <button class="btn-op" onclick="calcMul()">A × B</button>
         </div>
 
         <div class="section-title">Операции над выбранной:</div>
@@ -336,7 +344,7 @@
         </div>
     </div>
 
-    <!-- КАРТОЧКА РЕЗУЛЬТАТА -->
+    <!-- РЕЗУЛЬТАТ -->
     <div class="result-card" id="result-card">
         <div class="result-header">
             <span>Результат:</span>
@@ -363,29 +371,465 @@
 </div>
 
 <script>
+    // ============================================================================
+    // КЛАСС ДЛЯ РАБОТЫ С КОМПЛЕКСНЫМИ ЧИСЛАМИ
+    // ============================================================================
     class Complex {
         constructor(re, im = 0) { this.re = re; this.im = im; }
         add(c) { return new Complex(this.re + c.re, this.im + c.im); }
         sub(c) { return new Complex(this.re - c.re, this.im - c.im); }
         mul(c) { return new Complex(this.re * c.re - this.im * c.im, this.re * c.im + this.im * c.re); }
         div(c) {
+            if (typeof c === 'number') return new Complex(this.re / c, this.im / c);
             const d = c.re * c.re + c.im * c.im;
-            if (Math.abs(d) < 1e-12) return new Complex(0, 0);
+            if (Math.abs(d) < 1e-15) return new Complex(0, 0);
             return new Complex((this.re * c.re + this.im * c.im) / d, (this.im * c.re - this.re * c.im) / d);
         }
         abs() { return Math.hypot(this.re, this.im); }
         toString() {
-            const r = cleanVal(this.re);
-            const i = cleanVal(this.im);
-            if (i === 0) return formatNum(r);
-            if (r === 0) return `${formatNum(i)}i`;
-            return i > 0 ? `${formatNum(r)} + ${formatNum(i)}i` : `${formatNum(r)} - ${formatNum(Math.abs(i))}i`;
+            const cleanRe = Math.abs(this.re) < 1e-4 ? 0 : this.re;
+            const cleanIm = Math.abs(this.im) < 1e-4 ? 0 : this.im;
+            const fmtRe = formatNum(cleanRe);
+            const fmtIm = formatNum(Math.abs(cleanIm));
+
+            if (cleanIm === 0) return fmtRe;
+            if (cleanRe === 0) return cleanIm > 0 ? `${fmtIm}i` : `-${fmtIm}i`;
+            return cleanIm > 0 ? `${fmtRe} + ${fmtIm}i` : `${fmtRe} - ${fmtIm}i`;
         }
     }
+
+    // ============================================================================
+    // МАТЕМАТИЧЕСКИЙ ДВИЖОК
+    // ============================================================================
+    function mulM(a, b) {
+        const r1 = a.length, c1 = a[0].length, c2 = b[0].length;
+        const res = createEmpty(r1, c2);
+        for (let i = 0; i < r1; i++) {
+            for (let j = 0; j < c2; j++) { 
+                let s = 0; 
+                for (let k = 0; k < c1; k++) s += a[i][k]*b[k][j]; 
+                res[i][j] = s; 
+            }
+        }
+        return res;
+    }
+
+    function mulScalar(a, k) {
+        return a.map(row => row.map(v => v * k));
+    }
+
+    function addM(a, b) { return a.map((row, i) => row.map((v, j) => v + b[i][j])); }
+    function subM(a, b) { return a.map((row, i) => row.map((v, j) => v - b[i][j])); }
+
+    function normM(a) {
+        let s = 0; a.forEach(r => r.forEach(v => s += v*v));
+        return Math.sqrt(s);
+    }
+
+    function rankWithTolerance(matrix, tol = 1e-9) {
+        const r = matrix.length;
+        if (r === 0) return 0;
+        const c = matrix[0].length;
+        const a = matrix.map(row => [...row]);
+        let row = 0;
+        for (let col = 0; col < c; col++) {
+            if (row >= r) break;
+            let maxRow = row;
+            let maxVal = Math.abs(a[row][col]);
+            for (let i = row + 1; i < r; i++) {
+                const v = Math.abs(a[i][col]);
+                if (v > maxVal) { maxVal = v; maxRow = i; }
+            }
+            if (maxVal < tol) continue;
+            if (maxRow !== row) { const tmp = a[row]; a[row] = a[maxRow]; a[maxRow] = tmp; }
+            
+            for (let i = row + 1; i < r; i++) {
+                const factor = a[i][col] / a[row][col];
+                a[i][col] = 0;
+                for (let j = col + 1; j < c; j++) a[i][j] -= factor * a[row][j];
+            }
+            row++;
+        }
+        return row;
+    }
+
+    function eigenvalues(matrix) {
+        const n = matrix.length;
+        if (n === 0) return [];
+        if (n === 1) return [new Complex(matrix[0][0])];
+
+        let a = matrix.map(row => [...row]);
+
+        let converged = false;
+        let iterB = 0;
+        while (!converged && iterB < 50) {
+            iterB++;
+            converged = true;
+            for (let i = 0; i < n; i++) {
+                let cSum = 0, rSum = 0;
+                for (let j = 0; j < n; j++) {
+                    if (j !== i) { cSum += Math.abs(a[j][i]); rSum += Math.abs(a[i][j]); }
+                }
+                if (cSum > 1e-10 && rSum > 1e-10) {
+                    let f = 1.0; const s = cSum + rSum;
+                    while (cSum < rSum / 2.0) { cSum *= 2.0; f *= 2.0; }
+                    while (cSum >= rSum * 2.0) { cSum /= 2.0; f /= 2.0; }
+                    if ((cSum + rSum) / f < 0.95 * s) {
+                        converged = false;
+                        const g = 1.0 / f;
+                        for (let j = 0; j < n; j++) a[i][j] *= g;
+                        for (let j = 0; j < n; j++) a[j][i] *= f;
+                    }
+                }
+            }
+        }
+
+        for (let k = 0; k < n - 2; k++) {
+            let maxIdx = k + 1;
+            for (let i = k + 2; i < n; i++) if (Math.abs(a[i][k]) > Math.abs(a[maxIdx][k])) maxIdx = i;
+            if (Math.abs(a[maxIdx][k]) > 1e-12) {
+                if (maxIdx !== k + 1) {
+                    const rowTmp = a[maxIdx]; a[maxIdx] = a[k + 1]; a[k + 1] = rowTmp;
+                    for (let c = 0; c < n; c++) { const colTmp = a[c][maxIdx]; a[c][maxIdx] = a[c][k + 1]; a[c][k + 1] = colTmp; }
+                }
+                for (let i = k + 2; i < n; i++) {
+                    const factor = a[i][k] / a[k + 1][k];
+                    for (let j = k; j < n; j++) a[i][j] -= factor * a[k + 1][j];
+                    for (let j = 0; j < n; j++) a[j][k + 1] += factor * a[j][i];
+                }
+            }
+        }
+
+        const result = [];
+        let currentN = n;
+        let maxIter = 100 * n;
+
+        while (currentN > 1 && maxIter > 0) {
+            maxIter--;
+            const last = currentN - 1;
+
+            if (Math.abs(a[last][last - 1]) <= 1e-10 * (Math.abs(a[last - 1][last - 1]) + Math.abs(a[last][last]) + 1e-12)) {
+                result.push(new Complex(a[last][last]));
+                currentN--;
+                continue;
+            }
+
+            if (currentN === 2 || Math.abs(a[last - 1][last - 2]) <= 1e-10 * (Math.abs(a[last - 2][last - 2]) + Math.abs(a[last - 1][last - 1]) + 1e-12)) {
+                const tr2 = a[last - 1][last - 1] + a[last][last];
+                const det2 = a[last - 1][last - 1] * a[last][last] - a[last - 1][last] * a[last][last - 1];
+                const disc = tr2 * tr2 - 4.0 * det2;
+                const cleanDisc = Math.abs(disc) < 1e-9 ? 0 : disc;
+                
+                if (cleanDisc >= 0) {
+                    const sq = Math.sqrt(cleanDisc);
+                    result.push(new Complex((tr2 + sq) / 2.0));
+                    result.push(new Complex((tr2 - sq) / 2.0));
+                } else {
+                    const im = Math.sqrt(-cleanDisc) / 2.0;
+                    result.push(new Complex(tr2 / 2.0, im));
+                    result.push(new Complex(tr2 / 2.0, -im));
+                }
+                currentN -= 2;
+                continue;
+            }
+
+            const tr = a[last - 1][last - 1] + a[last][last];
+            const det2 = a[last - 1][last - 1] * a[last][last] - a[last - 1][last] * a[last][last - 1];
+            const disc = tr * tr - 4.0 * det2;
+            let shift;
+            if (disc >= 0) {
+                const s1 = (tr + Math.sqrt(disc)) / 2.0;
+                const s2 = (tr - Math.sqrt(disc)) / 2.0;
+                shift = Math.abs(s1 - a[last][last]) < Math.abs(s2 - a[last][last]) ? s1 : s2;
+            } else { shift = tr / 2.0; }
+
+            for (let i = 0; i < currentN; i++) a[i][i] -= shift;
+
+            const cosL = new Array(currentN - 1).fill(0); 
+            const sinL = new Array(currentN - 1).fill(0);
+            for (let i = 0; i < currentN - 1; i++) {
+                const xi = a[i][i], yi = a[i + 1][i];
+                const r = Math.hypot(xi, yi);
+                if (r > 1e-14) {
+                    cosL[i] = xi / r; sinL[i] = -yi / r;
+                    for (let j = i; j < currentN; j++) {
+                        const t1 = a[i][j], t2 = a[i + 1][j];
+                        a[i][j] = cosL[i] * t1 - sinL[i] * t2;
+                        a[i + 1][j] = sinL[i] * t1 + cosL[i] * t2;
+                    }
+                } else { cosL[i] = 1.0; sinL[i] = 0.0; }
+            }
+
+            for (let i = 0; i < currentN - 1; i++) {
+                for (let j = 0; j <= Math.min(i + 2, currentN - 1); j++) {
+                    const t1 = a[j][i], t2 = a[j][i + 1];
+                    a[j][i] = cosL[i] * t1 - sinL[i] * t2;
+                    a[j][i + 1] = sinL[i] * t1 + cosL[i] * t2;
+                }
+            }
+
+            for (let i = 0; i < currentN; i++) a[i][i] += shift;
+        }
+
+        if (currentN === 1) result.push(new Complex(a[0][0]));
+        while (result.length < n) {
+            const idx = n - 1 - result.length;
+            result.push(new Complex(a[idx][idx]));
+        }
+
+        return result.map(c => new Complex(
+            isNaN(c.re) || !isFinite(c.re) ? 0 : c.re,
+            isNaN(c.im) || !isFinite(c.im) ? 0 : c.im
+        )).sort((a, b) => b.abs() - a.abs());
+    }
+
+    function eigenvectors(matrix, eigs) {
+        const n = matrix.length;
+        const vectors = [];
+
+        for (const lambda of eigs) {
+            const mat = Array(n).fill(0).map((_, i) =>
+                Array(n).fill(0).map((_, j) => i === j ? new Complex(matrix[i][j]).sub(lambda) : new Complex(matrix[i][j]))
+            );
+
+            for (let i = 0; i < n - 1; i++) {
+                let maxR = i;
+                for (let k = i + 1; k < n; k++) if (mat[k][i].abs() > mat[maxR][i].abs()) maxR = k;
+                const tmp = mat[i]; mat[i] = mat[maxR]; mat[maxR] = tmp;
+
+                for (let k = i + 1; k < n; k++) {
+                    if (mat[i][i].abs() > 1e-10) {
+                        const factor = mat[k][i].div(mat[i][i]);
+                        for (let j = i; j < n; j++) mat[k][j] = mat[k][j].sub(factor.mul(mat[i][j]));
+                    }
+                }
+            }
+
+            const v = Array(n).fill(new Complex(0));
+            v[n - 1] = new Complex(1);
+
+            for (let i = n - 2; i >= 0; i--) {
+                let sum = new Complex(0);
+                for (let j = i + 1; j < n; j++) sum = sum.add(mat[i][j].mul(v[j]));
+                v[i] = mat[i][i].abs() > 1e-9 ? new Complex(0).sub(sum).div(mat[i][i]) : new Complex(1);
+            }
+
+            let normSq = 0;
+            for (const x of v) normSq += x.re * x.re + x.im * x.im;
+            const norm = Math.sqrt(normSq);
+            vectors.push(norm > 1e-12 && !isNaN(norm) ? v.map(x => x.div(norm)) : v);
+        }
+        return vectors;
+    }
+
+    function clusterEigenvalues(eigs, tol = 1e-3) {
+        const clusters = [];
+        for (const e of eigs) {
+            let found = false;
+            for (const c of clusters) {
+                if (Math.abs(e.re - c.re) < tol && Math.abs(e.im - c.im) < tol) {
+                    c.re = (c.re * c.count + e.re) / (c.count + 1);
+                    c.im = (c.im * c.count + e.im) / (c.count + 1);
+                    c.count++;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) clusters.push({ re: e.re, im: e.im, count: 1 });
+        }
+        return clusters;
+    }
+
+    function multiplyComplexMat(aRe, aIm, bRe, bIm) {
+        const n = aRe.length;
+        const resRe = createEmpty(n, n);
+        const resIm = createEmpty(n, n);
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                let sumRe = 0, sumIm = 0;
+                for (let k = 0; k < n; k++) {
+                    sumRe += aRe[i][k] * bRe[k][j] - aIm[i][k] * bIm[k][j];
+                    sumIm += aRe[i][k] * bIm[k][j] + aIm[i][k] * bRe[k][j];
+                }
+                resRe[i][j] = sumRe; resIm[i][j] = sumIm;
+            }
+        }
+        return [resRe, resIm];
+    }
+
+    function rankComplexMat(mRe, mIm) {
+        const n = mRe.length;
+        const realMat = createEmpty(2 * n, 2 * n);
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                realMat[i][j] = mRe[i][j]; realMat[i][j + n] = -mIm[i][j];
+                realMat[i + n][j] = mIm[i][j]; realMat[i + n][j + n] = mRe[i][j];
+            }
+        }
+        return Math.floor(rankWithTolerance(realMat, 1e-4) / 2);
+    }
+
+    function getJordanBlocks(matrix, lambdaRe, lambdaIm, maxAlgMultiplicity) {
+        const n = matrix.length;
+        const nRe = createEmpty(n, n), nIm = createEmpty(n, n);
+        for(let i=0; i<n; i++) {
+            for(let j=0; j<n; j++) {
+                nRe[i][j] = i === j ? matrix[i][j] - lambdaRe : matrix[i][j];
+                nIm[i][j] = i === j ? -lambdaIm : 0;
+            }
+        }
+
+        const ranks = [n, rankComplexMat(nRe, nIm)];
+        let currentPowerRe = nRe, currentPowerIm = nIm;
+        let k = 1;
+
+        while (ranks[k] < ranks[k - 1] && (n - ranks[k]) < maxAlgMultiplicity) {
+            const nextP = multiplyComplexMat(currentPowerRe, currentPowerIm, nRe, nIm);
+            currentPowerRe = nextP[0]; currentPowerIm = nextP[1];
+            ranks.push(rankComplexMat(currentPowerRe, currentPowerIm));
+            k++;
+        }
+        while (ranks.length <= n + 1) ranks.push(ranks[ranks.length - 1]);
+
+        const blocks = [];
+        for (let i = 1; i <= n; i++) {
+            const count = ranks[i - 1] - 2 * ranks[i] + ranks[i + 1];
+            for (let c = 0; c < count; c++) blocks.push(i);
+        }
+
+        let blocksSum = blocks.reduce((a,b)=>a+b, 0);
+        while (blocksSum < maxAlgMultiplicity) { blocks.push(1); blocksSum++; }
+        if (blocksSum > maxAlgMultiplicity) {
+            let currentSum = 0;
+            const trimmed = [];
+            for (const b of blocks) {
+                if (currentSum + b <= maxAlgMultiplicity) { trimmed.push(b); currentSum += b; }
+                else { trimmed.push(maxAlgMultiplicity - currentSum); break; }
+            }
+            return trimmed.sort((a,b)=>b-a);
+        }
+        return blocks.sort((a,b)=>b-a);
+    }
+
+    function formatJnfNum(v) {
+        const clean = Math.abs(v) < 1e-9 ? 0 : v;
+        const rounded = Math.round(clean * 1000) / 1000;
+        return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(3).replace(/\.?0+$/, '');
+    }
+
+    function formatJnfNumC(re, im) {
+        const reClean = Math.abs(re) < 1e-4 ? 0 : re;
+        const imClean = Math.abs(im) < 1e-4 ? 0 : im;
+        const reStr = formatJnfNum(reClean);
+        const imStr = formatJnfNum(Math.abs(imClean));
+        if (imClean === 0) return reStr;
+        if (reClean === 0) return imClean > 0 ? `${imStr}i` : `-${imStr}i`;
+        return imClean > 0 ? `${reStr} + ${imStr}i` : `${reStr} - ${imStr}i`;
+    }
+
+    function jordanFormCore(matrix, isReal = false) {
+        const n = matrix.length;
+        if (n === 0) return { desc: "Пусто", grid: [] };
+        const rawEig = eigenvalues(matrix);
+        const clusters = clusterEigenvalues(rawEig);
+        const jnf = Array(n).fill(0).map(() => Array(n).fill("0"));
+        let pos = 0;
+
+        if (!isReal) {
+            let hasMulti = false;
+            for (const cluster of clusters) {
+                if (cluster.count > 1) hasMulti = true;
+                const blocks = getJordanBlocks(matrix, cluster.re, cluster.im, cluster.count);
+                for (const bSize of blocks) {
+                    for (let i = 0; i < bSize; i++) {
+                        const cur = pos + i;
+                        if (cur < n) {
+                            jnf[cur][cur] = formatJnfNumC(cluster.re, cluster.im);
+                            if (i < bSize - 1 && cur + 1 < n) jnf[cur][cur + 1] = "1";
+                        }
+                    }
+                    pos += bSize;
+                }
+            }
+            while (pos < n) { jnf[pos][pos] = formatJnfNumC(rawEig[pos].re, rawEig[pos].im); pos++; }
+            return { desc: !hasMulti ? "Диагональный вид (Простой спектр):" : "Комплексная ЖНФ:", grid: jnf };
+        } else {
+            const processed = Array(clusters.length).fill(false);
+            for (let i = 0; i < clusters.length; i++) {
+                if (processed[i]) continue;
+                const c = clusters[i];
+                if (Math.abs(c.im) < 1e-3) {
+                    const blocks = getJordanBlocks(matrix, c.re, 0, c.count);
+                    for (const bSize of blocks) {
+                        for (let k = 0; k < bSize; k++) {
+                            if (pos + k < n) {
+                                jnf[pos + k][pos + k] = formatJnfNum(c.re);
+                                if (k < bSize - 1 && pos + k + 1 < n) jnf[pos + k][pos + k + 1] = "1";
+                            }
+                        }
+                        pos += bSize;
+                    }
+                    processed[i] = true;
+                } else {
+                    let conjIdx = -1;
+                    for (let j = i + 1; j < clusters.length; j++) {
+                        if (!processed[j] && Math.abs(clusters[j].re - c.re) < 1e-3 && Math.abs(clusters[j].im + c.im) < 1e-3) {
+                            conjIdx = j; break;
+                        }
+                    }
+                    const blocks = getJordanBlocks(matrix, c.re, c.im, c.count);
+                    const a = c.re, b = Math.abs(c.im);
+                    for (const bSize of blocks) {
+                        for (let k = 0; k < bSize; k++) {
+                            const cur = pos + 2 * k;
+                            if (cur + 1 < n) {
+                                jnf[cur][cur] = formatJnfNum(a); jnf[cur][cur + 1] = formatJnfNum(b);
+                                jnf[cur + 1][cur] = formatJnfNum(-b); jnf[cur + 1][cur + 1] = formatJnfNum(a);
+                                if (k < bSize - 1 && cur + 3 < n) {
+                                    jnf[cur][cur + 2] = "1"; jnf[cur + 1][cur + 3] = "1";
+                                }
+                            } else if (cur < n) jnf[cur][cur] = formatJnfNum(a);
+                        }
+                        pos += 2 * bSize;
+                    }
+                    processed[i] = true;
+                    if (conjIdx !== -1) processed[conjIdx] = true;
+                }
+            }
+            return { desc: "Вещественная Жорданова форма (РЖНФ):", grid: jnf };
+        }
+    }
+
+    function matrixExponential(a) {
+        const n = a.length;
+        let scaledA = a.map(row => [...row]);
+        let s = 0;
+        while (normM(scaledA) > 1.0) {
+            scaledA = mulScalar(scaledA, 0.5);
+            s++;
+        }
+        let res = createEmpty(n, n);
+        let term = createEmpty(n, n);
+        for(let i=0; i<n; i++) res[i][i] = term[i][i] = 1.0;
+        
+        for (let k = 1; k <= 15; k++) {
+            term = mulM(term, scaledA);
+            term = mulScalar(term, 1.0 / k);
+            res = addM(res, term);
+        }
+        for (let i = 0; i < s; i++) res = mulM(res, res);
+        return res;
+    }
+
+
+    // -------------------------------------------------------------
+    // СОСТОЯНИЕ И UI
+    // -------------------------------------------------------------
 
     let currentMode = 0;
     let history = JSON.parse(localStorage.getItem('matrix_history') || '[]');
     let lastResultMatrix = null;
+    let lastResultGrid = null; // Для хранения отформатированной строковой сетки (ЖНФ)
 
     let sqSize = 3, sqTab = 0;
     let sqMatrices = [createEmpty(3,3), createEmpty(3,3), createEmpty(3,3)];
@@ -393,22 +837,6 @@
     let rcMatrixA = createEmpty(2, 3), rcMatrixB = createEmpty(3, 2);
 
     function createEmpty(r, c) { return Array(r).fill(0).map(() => Array(c).fill(0)); }
-
-    // --- МАСТЕР-ОЧИСТИТЕЛЬ ЧИСЕЛ ---
-    function cleanVal(v) {
-        if (typeof v !== 'number' || isNaN(v)) return 0;
-        if (Math.abs(v) < 5e-5) return 0; // убивает 6e-8
-        const nearestInt = Math.round(v);
-        if (Math.abs(v - nearestInt) < 0.05) return nearestInt; // убивает 0.999 и 1.001
-        return parseFloat(v.toFixed(4));
-    }
-
-    function formatNum(v) {
-        const c = cleanVal(v);
-        if (c === 0) return '0';
-        return c % 1 === 0 ? c.toString() : c.toFixed(3).replace(/\.?0+$/, '');
-    }
-    function formatPrecise(v) { return cleanVal(v); }
 
     function switchMode(mode) {
         currentMode = mode;
@@ -421,7 +849,6 @@
         if (mode === 0) renderSq(); else renderRc();
     }
 
-    // --- КВАДРАТНЫЕ МАТРИЦЫ ---
     function renderSq() {
         const grid = document.getElementById('sq-matrix-grid');
         grid.style.gridTemplateColumns = `repeat(${sqSize}, 1fr)`;
@@ -434,7 +861,7 @@
                 input.value = data[i][j];
                 input.onfocus = () => { if (input.value === '0') input.value = ''; };
                 input.onblur = () => { if (input.value === '') input.value = '0'; };
-                input.oninput = (e) => { sqMatrices[sqTab][i][j] = cleanVal(parseFloat(e.target.value) || 0); };
+                input.oninput = (e) => { sqMatrices[sqTab][i][j] = parseFloat(e.target.value) || 0; };
                 grid.appendChild(input);
             }
         }
@@ -465,34 +892,24 @@
     }
 
     function fillSqRandom() {
-        for (let i = 0; i < sqSize; i++) for (let j = 0; j < sqSize; j++) sqMatrices[sqTab][i][j] = cleanVal(Math.floor(Math.random() * 19) - 9);
+        for (let i = 0; i < sqSize; i++) for (let j = 0; j < sqSize; j++) sqMatrices[sqTab][i][j] = Math.floor(Math.random() * 19) - 9;
         renderSq();
     }
     function clearSq() { sqMatrices[sqTab] = createEmpty(sqSize, sqSize); renderSq(); }
 
-    function applyPastedTextToMatrix(text, targetMatrix, maxRows, maxCols) {
-        if (!text || !text.trim()) return false;
-        const normalized = text.replace(/,/g, '.').replace(/−|–|—/g, '-').replace(/\[|\]/g, ' ').trim();
-        const numbers = normalized.match(/-?\d+(\.\d+)?([eE][+-]?\d+)?/g);
-        if (!numbers || numbers.length === 0) return false;
-        let idx = 0;
-        for (let i = 0; i < maxRows; i++) {
-            for (let j = 0; j < maxCols; j++) {
-                if (idx < numbers.length) targetMatrix[i][j] = cleanVal(parseFloat(numbers[idx++]) || 0);
-                else targetMatrix[i][j] = 0;
-            }
-        }
-        return true;
-    }
-
     async function pasteSq() {
-        let text = "";
-        try { if (navigator.clipboard && navigator.clipboard.readText) text = await navigator.clipboard.readText(); } catch (err) {}
-        if (!text || text.trim() === "") text = prompt("Вставьте матрицу сюда (Ctrl+V):");
-        if (text && applyPastedTextToMatrix(text, sqMatrices[sqTab], sqSize, sqSize)) renderSq();
+        try {
+            const text = await navigator.clipboard.readText();
+            const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
+            if (!nums) return alert('Числа не найдены!');
+            let idx = 0;
+            for (let i = 0; i < sqSize; i++) {
+                for (let j = 0; j < sqSize; j++) if (idx < nums.length) sqMatrices[sqTab][i][j] = parseFloat(nums[idx++]) || 0;
+            }
+            renderSq();
+        } catch(e) { alert("Вставка заблокирована браузером"); }
     }
 
-    // --- ПРЯМОУГОЛЬНЫЕ МАТРИЦЫ ---
     function renderRc() {
         const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
         const data = rcTab === 0 ? rcMatrixA : rcMatrixB;
@@ -507,14 +924,17 @@
                 input.onfocus = () => { if (input.value === '0') input.value = ''; };
                 input.onblur = () => { if (input.value === '') input.value = '0'; };
                 input.oninput = (e) => { 
-                    const val = cleanVal(parseFloat(e.target.value) || 0);
-                    if (rcTab === 0) rcMatrixA[i][j] = val; else rcMatrixB[i][j] = val; 
+                    if (rcTab === 0) rcMatrixA[i][j] = parseFloat(e.target.value) || 0; 
+                    else rcMatrixB[i][j] = parseFloat(e.target.value) || 0; 
                 };
                 grid.appendChild(input);
             }
         }
         document.getElementById('rc-rows-label').innerText = r;
         document.getElementById('rc-cols-label').innerText = c;
+        const color = rcTab === 0 ? 'var(--accent-cyan)' : 'var(--accent-purple)';
+        document.getElementById('rc-bracket-l').style.background = color;
+        document.getElementById('rc-bracket-r').style.background = color;
     }
 
     function switchRcTab(tab) {
@@ -544,137 +964,157 @@
         let tc = rcColsA; rcColsA = rcColsB; rcColsB = tc;
         renderRc(); 
     }
-    function setRcPreset(r, c) {
-        if (rcTab === 0) { rcRowsA = r; rcColsA = c; rcMatrixA = resize(rcMatrixA, r, c); }
-        else { rcRowsB = r; rcColsB = c; rcMatrixB = resize(rcMatrixB, r, c); }
-        renderRc();
-    }
     function fillRcRandom() {
         const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
-        for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) { 
-            const val = cleanVal(Math.floor(Math.random()*19)-9);
-            if (rcTab === 0) rcMatrixA[i][j] = val; else rcMatrixB[i][j] = val; 
-        }
+        for (let i = 0; i < r; i++) for (let j = 0; j < c; j++) { if (rcTab === 0) rcMatrixA[i][j] = Math.floor(Math.random()*19)-9; else rcMatrixB[i][j] = Math.floor(Math.random()*19)-9; }
         renderRc();
     }
     function clearRc() { if (rcTab === 0) rcMatrixA = createEmpty(rcRowsA, rcColsA); else rcMatrixB = createEmpty(rcRowsB, rcColsB); renderRc(); }
 
     async function pasteRc() {
-        let text = "";
-        try { if (navigator.clipboard && navigator.clipboard.readText) text = await navigator.clipboard.readText(); } catch (err) {}
-        if (!text || text.trim() === "") text = prompt("Вставьте матрицу сюда (Ctrl+V):");
-        if (text) {
+        try {
+            const text = await navigator.clipboard.readText();
+            const nums = text.replace(/,/g, '.').replace(/−|–|—/g, '-').match(/-?\d+(\.\d+)?/g);
+            if (!nums) return alert('Числа не найдены!');
             const r = rcTab === 0 ? rcRowsA : rcRowsB, c = rcTab === 0 ? rcColsA : rcColsB;
-            if (applyPastedTextToMatrix(text, rcTab === 0 ? rcMatrixA : rcMatrixB, r, c)) renderRc();
-        }
+            let idx = 0;
+            for (let i = 0; i < r; i++) {
+                for (let j = 0; j < c; j++) {
+                    if (idx < nums.length) {
+                        if (rcTab === 0) rcMatrixA[i][j] = parseFloat(nums[idx++]) || 0;
+                        else rcMatrixB[i][j] = parseFloat(nums[idx++]) || 0;
+                    }
+                }
+            }
+            renderRc();
+        } catch(e) { alert("Вставка заблокирована"); }
     }
 
-    // --- ВЫВОД И ИСТОРИЯ С ТАБЛИЧНОЙ ВЕРСТКОЙ ---
-    function showResult(contentHtml, title, mat = null) {
-        lastResultMatrix = mat ? mat.map(row => row.map(v => cleanVal(v))) : null;
+    // -------------------------------------------------------------
+    // ВЫВОД И ФОРМАТИРОВАНИЕ
+    // -------------------------------------------------------------
+    function formatNum(v) { 
+        if (Math.abs(v) < 1e-12) return '0';
+        let rounded = Math.round(v * 1000) / 1000;
+        return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(3).replace(/\.?0+$/, '');
+    }
+
+    function formatPrecise(v) {
+        return Math.abs(v) < 1e-12 ? 0 : Number(v.toFixed(8));
+    }
+
+    // matOrGrid: либо массив чисел (DoubleArray[]), либо сетка строк (String[][])
+    function showResult(text, title, matOrGrid = null, isGridStr = false) {
+        if (!isGridStr) {
+            lastResultMatrix = matOrGrid;
+            lastResultGrid = null;
+        } else {
+            lastResultMatrix = null;
+            lastResultGrid = matOrGrid;
+        }
         
-        // Рисуем идеальную HTML таблицу для матрицы
-        const finalHtml = mat ? formatTableHTML(mat) : contentHtml;
+        let outHtml = text ? `<div style="margin-bottom:8px;">${text}</div>` : '';
+        if (matOrGrid) outHtml += formatTableHTML(matOrGrid);
         
-        document.getElementById('result-text').innerHTML = finalHtml;
+        document.getElementById('result-text').innerHTML = outHtml || text;
         document.getElementById('result-card').style.display = 'flex';
-        document.getElementById('transfer-block').style.display = mat ? 'flex' : 'none';
-        document.getElementById('transfer-title').style.display = mat ? 'block' : 'none';
+        document.getElementById('transfer-block').style.display = lastResultMatrix ? 'flex' : 'none';
+        document.getElementById('transfer-title').style.display = lastResultMatrix ? 'block' : 'none';
         
-        // СОХРАНЯЕМ В ИСТОРИЮ ТЕКСТ + САМУ МАТРИЦУ ДЛЯ РЕНДЕРА ТАБЛИЦЫ
-        addHistory(title, contentHtml, lastResultMatrix);
+        addHistory(title, document.getElementById('result-text').innerText);
     }
 
     function formatTableHTML(mat) {
-        let html = '<div style="display:flex; justify-content:center; align-items:center; gap:6px; margin:6px 0; overflow-x:auto;">';
-        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 30) + 'px;"></div>';
+        let html = '<div style="display:flex; justify-content:center; align-items:center; gap:6px; margin:6px 0;">';
+        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div>';
         html += '<table style="border-collapse:collapse; text-align:center;">';
         for (let i = 0; i < mat.length; i++) {
             html += '<tr>';
             for (let j = 0; j < mat[i].length; j++) {
-                const val = cleanVal(mat[i][j]);
-                const formatted = formatNum(val);
-                const isComplex = formatted.toString().includes('i');
-                const width = isComplex ? '120px' : '55px';
-                const color = (formatted === '1' && i !== j) ? 'var(--accent-cyan)' : 'var(--text-white)';
+                // Если матрица чисел - форматируем, если строк (ЖНФ) - выводим как есть
+                const val = typeof mat[i][j] === 'number' ? formatNum(mat[i][j]) : mat[i][j];
+                const isComplex = val.toString().includes('i');
+                const width = isComplex ? '110px' : '55px';
+                const color = (val === '1' && i !== j) ? 'var(--accent-cyan)' : 'var(--text-white)';
                 const weight = (i === j) ? 'bold' : 'normal';
-                html += `<td style="width:${width}; height:30px; padding:2px 4px; font-family:monospace; font-size:13px; color:${color}; font-weight:${weight}; white-space:nowrap;">${formatted}</td>`;
+                html += `<td style="width:${width}; height:32px; padding:2px 4px; font-family:monospace; font-size:13px; color:${color}; font-weight:${weight};">${val}</td>`;
             }
             html += '</tr>';
         }
-        html += '</table><div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 30) + 'px;"></div></div>';
+        html += '</table>';
+        html += '<div style="width:3px; background:var(--accent-emerald); border-radius:3px; height:' + (mat.length * 32) + 'px;"></div></div>';
         return html;
     }
 
-    // --- МАТЕМАТИКА ---
-    function addM(a, b) {
-        if (!a || !b || a.length !== b.length || a[0].length !== b[0].length) return null;
-        return a.map((row, i) => row.map((v, j) => cleanVal(v + b[i][j])));
-    }
-    function subM(a, b) {
-        if (!a || !b || a.length !== b.length || a[0].length !== b[0].length) return null;
-        return a.map((row, i) => row.map((v, j) => cleanVal(v - b[i][j])));
-    }
-    function mulM(a, b) {
-        if (!a || !b || a[0].length !== b.length) return null;
-        const r1 = a.length, c1 = a[0].length, c2 = b[0].length;
-        const res = createEmpty(r1, c2);
-        for (let i = 0; i < r1; i++) for (let j = 0; j < c2; j++) { 
-            let s = 0; for (let k = 0; k < c1; k++) s += a[i][k]*b[k][j]; res[i][j] = cleanVal(s); 
-        }
-        return res;
-    }
+    function formatRaw(mat) { return mat.map(row => row.map(v => formatNum(v)).join('\t')).join('\n'); }
 
-    function calcSqAdd() { const res = addM(sqMatrices[0], sqMatrices[1]); if (!res) return alert("Ошибка размеров!"); showResult("", "A + B", res); }
-    function calcSqSub() { const res = subM(sqMatrices[0], sqMatrices[1]); if (!res) return alert("Ошибка размеров!"); showResult("", "A - B", res); }
-    function calcSqMul() { const res = mulM(sqMatrices[0], sqMatrices[1]); if (!res) return alert("Ошибка умножения!"); showResult("", "A × B", res); }
-
-    function calcTripleAdd() {
-        const ab = addM(sqMatrices[0], sqMatrices[1]); const res = ab ? addM(ab, sqMatrices[2]) : null;
-        if (!res) return alert("Ошибка!"); showResult("", "A + B + C", res);
-    }
-    function calcTripleSub() {
-        const ab = subM(sqMatrices[0], sqMatrices[1]); const res = ab ? subM(ab, sqMatrices[2]) : null;
-        if (!res) return alert("Ошибка!"); showResult("", "A - B - C", res);
-    }
-    function calcTripleMul() {
-        const ab = mulM(sqMatrices[0], sqMatrices[1]); const res = ab ? mulM(ab, sqMatrices[2]) : null;
-        if (!res) return alert("Ошибка!"); showResult("", "A × B × C", res);
-    }
-
-    function calcTranspose() { const m = sqMatrices[sqTab]; const r = m.map((_, i) => m.map(row => cleanVal(row[i]))); showResult("", 'Aᵀ', r); }
-    function calcNorm() { let s = 0; sqMatrices[sqTab].forEach(r => r.forEach(v => s += v*v)); showResult(`<div style="font-size:16px; font-weight:bold;">‖A‖_F = ${formatNum(Math.sqrt(s))}</div>`, 'Норма Фробениуса'); }
-    function calcTrace() { let tr = 0; for(let i=0;i<sqSize;i++) tr += sqMatrices[sqTab][i][i]; showResult(`<div style="font-size:16px; font-weight:bold;">Tr(A) = ${formatNum(tr)}</div>`, 'След Tr(A)'); }
+    // -------------------------------------------------------------
+    // МАТЕМАТИЧЕСКИЕ ОБРАБОТЧИКИ
+    // -------------------------------------------------------------
     
+    function calcEigenvalues() {
+        const eigs = eigenvalues(sqMatrices[sqTab]);
+        const text = eigs.map((c, idx) => `λ_${idx+1} = ${c.toString()}`).join('\n');
+        showResult(`Собственные числа:\n${text}`, 'Собственные числа λ_i');
+    }
+
+    function calcEigenvectors() {
+        const eigs = eigenvalues(sqMatrices[sqTab]);
+        const vecs = eigenvectors(sqMatrices[sqTab], eigs);
+        const text = vecs.map((v, idx) => `v_${idx+1} (λ = ${eigs[idx]}):\n[ ${v.map(c=>c.toString()).join(', ')} ]ᵀ`).join('\n\n');
+        showResult(`Собственные векторы:\n${text}`, 'Собственные векторы v_i');
+    }
+
+    function calcJordan() {
+        const res = jordanFormCore(sqMatrices[sqTab], false);
+        showResult(res.desc, 'ЖНФ', res.grid, true);
+    }
+    
+    function calcRealJordan() {
+        const res = jordanFormCore(sqMatrices[sqTab], true);
+        showResult(res.desc, 'РЖНФ', res.grid, true);
+    }
+
+    function calcMatrixExp() {
+        const res = matrixExponential(sqMatrices[sqTab]);
+        showResult('', 'Экспонента e^A', res);
+    }
+
+    function calcSquare() {
+        const res = mulM(sqMatrices[sqTab], sqMatrices[sqTab]);
+        showResult('', 'Квадрат A²', res);
+    }
+
+    function calcSqAdd() { const r = addM(sqMatrices[0], sqMatrices[1]); showResult('', 'A + B', r); }
+    function calcSqSub() { const r = subM(sqMatrices[0], sqMatrices[1]); showResult('', 'A - B', r); }
+    function calcSqMul() { const r = mulM(sqMatrices[0], sqMatrices[1]); showResult('', 'A × B', r); }
+    function calcTripleAdd() { const r = addM(addM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult('', 'A + B + C', r); }
+    function calcTripleSub() { const r = subM(subM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult('', 'A - B - C', r); }
+    function calcTripleMul() { const r = mulM(mulM(sqMatrices[0], sqMatrices[1]), sqMatrices[2]); showResult('', 'A × B × C', r); }
+
+    function calcTranspose() { const m = sqMatrices[sqTab]; const r = m.map((_, i) => m.map(row => row[i])); showResult('', 'Aᵀ', r); }
+    function calcNorm() { let s = 0; sqMatrices[sqTab].forEach(r => r.forEach(v => s += v*v)); showResult(`‖A‖_F = ${Math.sqrt(s).toFixed(3)}`, 'Норма Фробениуса'); }
+    function calcTrace() { let tr = 0; for(let i=0;i<sqSize;i++) tr += sqMatrices[sqTab][i][i]; showResult(`Tr(A) = ${formatNum(tr)}`, 'След Tr(A)'); }
     function calcDet() {
-        const a = sqMatrices[sqTab].map(r => r.map(v => cleanVal(v))); let det = 1;
+        const a = sqMatrices[sqTab].map(r => [...r]); let det = 1;
         for (let i = 0; i < sqSize; i++) {
             let p = i; for (let j = i+1; j < sqSize; j++) if (Math.abs(a[j][i]) > Math.abs(a[p][i])) p = j;
-            if (Math.abs(a[p][i]) < 1e-12) return showResult('<div style="font-size:16px; font-weight:bold;">det(A) = 0</div>', 'Определитель');
+            if (Math.abs(a[p][i]) < 1e-12) return showResult('det(A) = 0', 'Определитель');
             if (i !== p) { [a[i], a[p]] = [a[p], a[i]]; det = -det; }
             det *= a[i][i];
             for (let j = i+1; j < sqSize; j++) { const f = a[j][i]/a[i][i]; for (let k = i+1; k < sqSize; k++) a[j][k] -= f*a[i][k]; }
         }
-        showResult(`<div style="font-size:16px; font-weight:bold;">det(A) = ${formatNum(det)}</div>`, 'Определитель');
+        showResult(`det(A) = ${formatNum(det)}`, 'Определитель');
     }
-
+    
     function calcRank() {
-        const a = sqMatrices[sqTab].map(r => r.map(v => cleanVal(v))); let rank = sqSize;
-        for (let r = 0; r < rank; r++) {
-            if (Math.abs(a[r][r]) > 1e-12) {
-                for (let c = 0; c < sqSize; c++) if (c !== r) { const m = a[c][r]/a[r][r]; for (let i = 0; i < rank; i++) a[c][i] -= m*a[r][i]; }
-            } else {
-                let red = true; for (let i = r+1; i < sqSize; i++) if (Math.abs(a[i][r]) > 1e-12) { [a[r], a[i]] = [a[i], a[r]]; red = false; break; }
-                if (red) { rank--; for (let i = 0; i < sqSize; i++) a[i][r] = a[i][rank]; }
-                r--;
-            }
-        }
-        showResult(`<div style="font-size:16px; font-weight:bold;">rank(A) = ${rank}</div>`, 'Ранг матрицы');
+        const r = rankWithTolerance(sqMatrices[sqTab]);
+        showResult(`rank(A) = ${r}`, 'Ранг матрицы');
     }
 
     function calcInverse() {
         const n = sqSize;
-        const aug = sqMatrices[sqTab].map((row, i) => [...row.map(v => cleanVal(v)), ...Array(n).fill(0).map((_, j) => (i === j ? 1 : 0))]);
+        const aug = sqMatrices[sqTab].map((row, i) => [...row, ...Array(n).fill(0).map((_, j) => (i === j ? 1 : 0))]);
         for (let i = 0; i < n; i++) {
             let mx = i; for (let k = i+1; k < n; k++) if (Math.abs(aug[k][i]) > Math.abs(aug[mx][i])) mx = k;
             [aug[i], aug[mx]] = [aug[mx], aug[i]];
@@ -682,78 +1122,52 @@
             const div = aug[i][i]; for (let j = 0; j < 2*n; j++) aug[i][j] /= div;
             for (let k = 0; k < n; k++) if (k !== i) { const f = aug[k][i]; for (let j = 0; j < 2*n; j++) aug[k][j] -= f*aug[i][j]; }
         }
-        const res = aug.map(row => row.map(v => cleanVal(v)).slice(n));
-        showResult("", 'A⁻¹', res);
+        const res = aug.map(row => row.slice(n));
+        showResult('', 'A⁻¹', res);
     }
 
-    // Спектр (Заглушка для JS - вывод по диагонали)
-    function calcEigenvalues() {
-        const m = sqMatrices[sqTab];
-        let eigs = [];
-        for(let i=0; i<sqSize; i++) eigs.push(new Complex(cleanVal(m[i][i])));
-        const html = eigs.map((c, idx) => `<div style="padding:4px 0;">λ_${idx + 1} = <b>${c.toString()}</b></div>`).join('');
-        showResult(`<div style="font-size:13px; color:var(--text-dim); margin-bottom:8px;">Собственные числа:</div>` + html, 'Собственные числа λ_i');
-    }
-    function calcEigenvectors() {
-        let text = "";
-        for(let i=0; i<sqSize; i++) {
-            let vec = Array(sqSize).fill(0); vec[i] = 1;
-            text += `<div style="margin-bottom:8px;">v_${i+1} = [ ${vec.join(', ')} ]ᵀ</div>`;
-        }
-        showResult(text, 'Собственные векторы v_i');
-    }
-    function calcJordan() {
-        const n = sqSize;
-        const jnf = Array(n).fill(0).map(() => Array(n).fill(0));
-        for (let i = 0; i < n; i++) jnf[i][i] = cleanVal(sqMatrices[sqTab][i][i]);
-        showResult("", 'Жорданова форма', jnf);
-    }
-
-    // Прямоугольные операции
     function calcRcMul() { 
         if (rcColsA !== rcRowsB) return alert(`Ошибка! Столбцов A (${rcColsA}) должно быть равно строкам B (${rcRowsB})`);
-        const res = mulM(rcMatrixA, rcMatrixB); showResult("", 'A × B', res); 
+        const res = mulM(rcMatrixA, rcMatrixB); showResult('', 'A × B', res); 
     }
     function calcRcAdd() { 
-        if (rcRowsA !== rcRowsB || rcColsA !== rcColsB) return alert('Размеры должны совпадать!');
-        const res = addM(rcMatrixA, rcMatrixB); showResult("", 'A + B', res); 
+        if (rcRowsA !== rcRowsB || rcColsA !== rcColsB) return alert('Размеры матриц должны совпадать!');
+        const res = addM(rcMatrixA, rcMatrixB); showResult('', 'A + B', res); 
     }
     function calcRcSub() { 
-        if (rcRowsA !== rcRowsB || rcColsA !== rcColsB) return alert('Размеры должны совпадать!');
-        const res = subM(rcMatrixA, rcMatrixB); showResult("", 'A - B', res); 
+        if (rcRowsA !== rcRowsB || rcColsA !== rcColsB) return alert('Размеры матриц должны совпадать!');
+        const res = subM(rcMatrixA, rcMatrixB); showResult('', 'A - B', res); 
     }
     function calcDotProduct() {
         const a = rcMatrixA.flat(), b = rcMatrixB.flat();
         if (a.length !== b.length) return alert('Длины векторов не совпадают!');
         let s = 0; for(let i=0; i<a.length; i++) s += a[i]*b[i];
-        showResult(`<div style="font-size:16px; font-weight:bold;">a · b = ${formatNum(cleanVal(s))}</div>`, 'Скалярное произведение');
+        showResult(`a · b = ${formatNum(s)}`, 'Скалярное произведение');
     }
     function calcCrossProduct() {
         const a = rcMatrixA.flat(), b = rcMatrixB.flat();
-        if(a.length !== 3 || b.length !== 3) return alert('Только для 3D!');
+        if(a.length !== 3 || b.length !== 3) return alert('Только для 3D векторов!');
         const res = [[a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]]];
-        showResult("", 'a ⨯ b', res);
+        showResult('', 'a ⨯ b', res);
     }
 
-    // --- ПЕРЕНОСЫ И ИСТОРИЯ ---
-    function transferResult(target, customMatrix = null) {
-        const mat = customMatrix || lastResultMatrix;
-        if (!mat) return;
-        const cleanedMat = mat.map(r => r.map(v => formatPrecise(v)));
+    // Перенос результатов
+    function transferResult(target) {
+        if (!lastResultMatrix) return;
         if (currentMode === 0) {
-            sqSize = cleanedMat.length;
-            sqMatrices[target] = cleanedMat;
+            sqSize = lastResultMatrix.length;
+            sqMatrices[target] = lastResultMatrix.map(r => r.map(v => formatPrecise(v)));
             switchSqTab(target);
         } else {
             if (target === 0) {
-                rcRowsA = cleanedMat.length; rcColsA = cleanedMat[0].length;
-                rcMatrixA = cleanedMat; switchRcTab(0);
+                rcRowsA = lastResultMatrix.length; rcColsA = lastResultMatrix[0].length;
+                rcMatrixA = lastResultMatrix.map(r => r.map(v => formatPrecise(v))); switchRcTab(0);
             } else if (target === 1) {
-                rcRowsB = cleanedMat.length; rcColsB = cleanedMat[0].length;
-                rcMatrixB = cleanedMat; switchRcTab(1);
+                rcRowsB = lastResultMatrix.length; rcColsB = lastResultMatrix[0].length;
+                rcMatrixB = lastResultMatrix.map(r => r.map(v => formatPrecise(v))); switchRcTab(1);
             }
         }
-        toggleHistory(); // Автоматически закрываем шторку истории
+        alert(`Перенесено в матрицу ${target === 0 ? 'A' : (target === 1 ? 'B' : 'C')}!`);
     }
 
     function copyResult() {
@@ -761,47 +1175,30 @@
         alert('Скопировано в буфер!');
     }
 
-    // СОХРАНЕНИЕ И ОТРИСОВКА ИСТОРИИ (ИДЕАЛЬНАЯ ВЕРСТКА)
-    function addHistory(title, text, mat = null) {
-        history.unshift({ title, text, mat, time: new Date().toLocaleTimeString() });
+    // История
+    function addHistory(title, text) {
+        history.unshift({ title, text, time: new Date().toLocaleTimeString() });
         localStorage.setItem('matrix_history', JSON.stringify(history));
         document.getElementById('hist-count').innerText = history.length;
         renderHistory();
     }
-    
     function renderHistory() {
-        document.getElementById('history-list').innerHTML = history.map((item, idx) => {
-            const contentHTML = item.mat ? formatTableHTML(item.mat) : `<div style="font-family:monospace; font-size:14px; margin-top:8px;">${item.text}</div>`;
-            
-            // Кнопки переноса для матрицы в истории
-            const transferBtnsHTML = item.mat ? `
-                <div style="display:flex; gap:6px; margin-top:10px; border-top:1px solid var(--border-color); padding-top:10px;">
-                    <button class="btn-transfer a" onclick='transferResult(0, ${JSON.stringify(item.mat)})'>➔ в A</button>
-                    <button class="btn-transfer b" onclick='transferResult(1, ${JSON.stringify(item.mat)})'>➔ в B</button>
-                    <button class="btn-transfer c" onclick='transferResult(2, ${JSON.stringify(item.mat)})'>➔ в C</button>
-                </div>
-            ` : '';
-
-            return `
+        document.getElementById('history-list').innerHTML = history.map(item => `
             <div class="history-item">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:var(--accent-cyan); font-weight:bold; font-size:13px;">${item.title}</span>
-                    <span style="color:var(--text-dim); font-size:11px;">${item.time}</span>
+                <div style="display:flex; justify-content:space-between; color:var(--accent-cyan); font-weight:bold;">
+                    <span>${item.title}</span><span style="color:var(--text-dim);">${item.time}</span>
                 </div>
-                ${contentHTML}
-                ${transferBtnsHTML}
+                <div style="margin-top:6px; white-space:pre-wrap;">${item.text}</div>
             </div>
-            `;
-        }).join('');
+        `).join('');
     }
-    
     function toggleHistory() {
         const m = document.getElementById('history-modal');
         m.style.display = m.style.display === 'block' ? 'none' : 'block';
     }
-    
     function clearHistory() { history = []; localStorage.removeItem('matrix_history'); document.getElementById('hist-count').innerText = '0'; renderHistory(); }
 
+    // Инициализация
     renderSq();
     renderHistory();
     document.getElementById('hist-count').innerText = history.length;
